@@ -1,0 +1,46 @@
+🚀 Initializing Z-AI SDK...
+🔎 Searching images: "fire safety evacuation emergency workplace drill"
+✅ Got 5 images
+{
+  "success": true,
+  "query": "fire safety evacuation emergency workplace drill",
+  "count": 5,
+  "ranked": false,
+  "results": [
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/9f29212dc963.jpg",
+      "caption": "",
+      "source": "National Park Service",
+      "original_width": "1876px",
+      "original_height": "501px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/588fa1365c17.png",
+      "caption": "",
+      "source": "hsse world",
+      "original_width": "878px",
+      "original_height": "1131px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/37920675225c.jpg",
+      "caption": "",
+      "source": "LinkedIn",
+      "original_width": "800px",
+      "original_height": "1131px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/39172d3bcfaf.jpg",
+      "caption": "",
+      "source": "Irwin's Safety",
+      "original_width": "1800px",
+      "original_height": "900px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/e6924610a236.jpg",
+      "caption": "",
+      "source": "LinkedIn",
+      "original_width": "800px",
+      "original_height": "1065px"
+    }
+  ]
+}

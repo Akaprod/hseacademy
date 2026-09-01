@@ -1,0 +1,263 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  password      String?
+  phone         String?
+  role          String   @default("user") // user, admin
+  avatar        String?
+  bio           String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  comments       Comment[]
+  certifications Certification[]
+  enrollments    Enrollment[]
+  attestations   CourseAttestation[]
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  color       String   @default("#059669")
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  articles    Article[]
+}
+
+model Article {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  excerpt     String?
+  content     String   @default("")
+  coverImage  String?
+  published   Boolean  @default(true)
+  featured    Boolean  @default(false)
+  viewCount   Int      @default(0)
+  authorName  String   @default("IICP")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id])
+
+  comments    Comment[]
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  status    String   @default("approved") // pending, approved, rejected
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  articleId String
+  article   Article  @relation(fields: [articleId], references: [id])
+}
+
+model Certification {
+  id              String   @id @default(cuid())
+  certificateNo   String   @unique
+  type            String   // attestation, diplome
+  fullName        String
+  programName     String
+  level           String   // technicien, licence, master
+  issuedDate      DateTime
+  expirationDate  DateTime?
+  status          String   @default("valid") // valid, expired, revoked
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  userId          String?
+  user            User?   @relation(fields: [userId], references: [id])
+}
+
+model Formation {
+  id                String   @id @default(cuid())
+  title             String
+  slug              String   @unique
+  shortDescription  String
+  fullDescription   String   @default("")
+  level             String   // technicien, technicien-superieur, licence, master, certifiant
+  duration          String
+  durationHours     String?
+  prerequisites     String?
+  objectives        String   @default("[]") // JSON array
+  program           String   @default("[]") // JSON array
+  price             String?
+  priceIndividual   String?
+  priceGroup        String?
+  priceEnterprise   String?
+  mode              String   @default("presentiel") // presentiel, distance, hybride
+  type              String   @default("diplomante") // diplomante, certifiante
+  coverImage        String?
+  featured          Boolean  @default(false)
+  order             Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model Newsletter {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Testimonial {
+  id        String   @id @default(cuid())
+  name      String
+  role      String
+  company   String?
+  content   String
+  avatar    String?
+  rating    Int      @default(5)
+  featured  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  subject   String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Page {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  content     String   @default("")
+  metaTitle   String?
+  metaDescription String?
+  published   Boolean  @default(true)
+  order       Int      @default(0)
+  showInMenu  Boolean  @default(false)
+  parentSlug  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model MenuItem {
+  id          String   @id @default(cuid())
+  label       String
+  page        String?
+  url         String?
+  parentId    String?
+  parent      MenuItem?  @relation("MenuHierarchy", fields: [parentId], references: [id])
+  children    MenuItem[] @relation("MenuHierarchy")
+  order       Int      @default(0)
+  icon        String?
+  target      String   @default("_self")
+  visible     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model OnlineCourse {
+  id              String   @id @default(cuid())
+  title           String
+  slug            String   @unique
+  description     String   @default("")
+  shortDescription String   @default("")
+  level           String   @default("debutant")
+  icon            String   @default("BookOpen")
+  coverImage      String?
+  price           Float    @default(0)
+  isFree          Boolean  @default(true)
+  published       Boolean  @default(true)
+  featured        Boolean  @default(false)
+  order           Int      @default(0)
+  totalChapters   Int      @default(0)
+  totalHours      String   @default("")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  chapters     Chapter[]
+  enrollments  Enrollment[]
+  attestations CourseAttestation[]
+}
+
+model Chapter {
+  id          String   @id @default(cuid())
+  title       String
+  content     String   @default("")
+  order       Int      @default(0)
+  courseId    String
+  course      OnlineCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  questions Question[]
+}
+
+model Question {
+  id            String   @id @default(cuid())
+  question      String
+  options       String   @default("[]")
+  correctIndex  Int      @default(0)
+  explanation   String   @default("")
+  order         Int      @default(0)
+  chapterId     String
+  chapter       Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Enrollment {
+  id               String    @id @default(cuid())
+  userId           String
+  user             User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId         String
+  course           OnlineCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  status           String    @default("active")
+  currentChapter   Int       @default(1)
+  completedChapters String   @default("[]")
+  chapterScores    String   @default("{}")
+  overallScore     Int       @default(0)
+  startedAt        DateTime  @default(now())
+  completedAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([userId, courseId])
+}
+
+model CourseAttestation {
+  id              String   @id @default(cuid())
+  attestationNo   String   @unique
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId        String
+  course          OnlineCourse @relation(fields: [courseId], references: [id])
+  enrollmentId    String
+  fullName        String
+  courseName      String
+  overallScore    Int
+  issuedDate      DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}

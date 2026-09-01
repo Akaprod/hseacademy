@@ -1,0 +1,46 @@
+🚀 Initializing Z-AI SDK...
+🔎 Searching images: "workplace safety PPE construction helmet protection"
+✅ Got 5 images
+{
+  "success": true,
+  "query": "workplace safety PPE construction helmet protection",
+  "count": 5,
+  "ranked": false,
+  "results": [
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/3f81bf8bff31.jpg",
+      "caption": "",
+      "source": "Laifappe",
+      "original_width": "1200px",
+      "original_height": "896px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/8fcac9e5256c.jpg",
+      "caption": "",
+      "source": "YouTube",
+      "original_width": "1280px",
+      "original_height": "720px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/7c073e8b313f.jpg",
+      "caption": "",
+      "source": "Dunbar's Electric",
+      "original_width": "1024px",
+      "original_height": "976px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/b51983f4eefc.png",
+      "caption": "",
+      "source": "PowerPak Civil & Safety",
+      "original_width": "1050px",
+      "original_height": "1050px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/49f5081460c9.jpg",
+      "caption": "",
+      "source": "eBay",
+      "original_width": "1200px",
+      "original_height": "1200px"
+    }
+  ]
+}

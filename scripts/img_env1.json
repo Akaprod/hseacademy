@@ -1,0 +1,46 @@
+🚀 Initializing Z-AI SDK...
+🔎 Searching images: "ISO 14001 environmental management green sustainability"
+✅ Got 5 images
+{
+  "success": true,
+  "query": "ISO 14001 environmental management green sustainability",
+  "count": 5,
+  "ranked": false,
+  "results": [
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/4a35ce3bf8fe.jpg",
+      "caption": "",
+      "source": "LinkedIn",
+      "original_width": "1280px",
+      "original_height": "720px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/1abc1adfd3e9.png",
+      "caption": "",
+      "source": "Sunstar Group",
+      "original_width": "1200px",
+      "original_height": "841px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/900a81fbe551.jpg",
+      "caption": "",
+      "source": "CNet Training",
+      "original_width": "2400px",
+      "original_height": "1256px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/d11f275f03c4.jpg",
+      "caption": "",
+      "source": "ISO CERTIFICATION INDIA",
+      "original_width": "2048px",
+      "original_height": "2048px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/dd0773c0ded5.jpg",
+      "caption": "",
+      "source": "x.com",
+      "original_width": "1024px",
+      "original_height": "768px"
+    }
+  ]
+}

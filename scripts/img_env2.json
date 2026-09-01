@@ -1,0 +1,46 @@
+🚀 Initializing Z-AI SDK...
+🔎 Searching images: "waste management recycling sorting industrial"
+✅ Got 5 images
+{
+  "success": true,
+  "query": "waste management recycling sorting industrial",
+  "count": 5,
+  "ranked": false,
+  "results": [
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/935f99451753.jpg",
+      "caption": "",
+      "source": "Automation Electric & Controls",
+      "original_width": "1200px",
+      "original_height": "798px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/f8506f3437d7.jpg",
+      "caption": "",
+      "source": "Machinex",
+      "original_width": "2048px",
+      "original_height": "1536px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/2b09f29f106c.jpg",
+      "caption": "",
+      "source": "Alamy",
+      "original_width": "1300px",
+      "original_height": "957px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/7aa94d947018.jpeg",
+      "caption": "",
+      "source": "Eagle Transfer Services",
+      "original_width": "1200px",
+      "original_height": "800px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/97bc41287c7f.jpeg",
+      "caption": "",
+      "source": "ZEISS",
+      "original_width": "1024px",
+      "original_height": "1024px"
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+🚀 Initializing Z-AI SDK...
+🔎 Searching images: "occupational health safety certificate diploma training"
+✅ Got 5 images
+{
+  "success": true,
+  "query": "occupational health safety certificate diploma training",
+  "count": 5,
+  "ranked": false,
+  "results": [
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/0786fddec7b4.jpg",
+      "caption": "",
+      "source": "LinkedIn",
+      "original_width": "800px",
+      "original_height": "1099px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/b0342a9bfa33.jpg",
+      "caption": "",
+      "source": "LinkedIn",
+      "original_width": "800px",
+      "original_height": "1133px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/7a70c7c8aa8d.jpg",
+      "caption": "",
+      "source": "SHE Knows Health & Safety",
+      "original_width": "1024px",
+      "original_height": "1024px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/a0f275085c2b.png",
+      "caption": "",
+      "source": "Docthub",
+      "original_width": "1920px",
+      "original_height": "1080px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/8671fc04dbe3.jpg",
+      "caption": "",
+      "source": "SMART College",
+      "original_width": "1400px",
+      "original_height": "1400px"
+    }
+  ]
+}

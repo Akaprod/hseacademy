@@ -1,0 +1,46 @@
+🚀 Initializing Z-AI SDK...
+🔎 Searching images: "HACCP food safety hygiene professional kitchen"
+✅ Got 5 images
+{
+  "success": true,
+  "query": "HACCP food safety hygiene professional kitchen",
+  "count": 5,
+  "ranked": false,
+  "results": [
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/bf988904eddf.jpg",
+      "caption": "",
+      "source": "LinkedIn",
+      "original_width": "800px",
+      "original_height": "1040px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/2ea777a6875f.jpg",
+      "caption": "",
+      "source": "Safety Culture",
+      "original_width": "1344px",
+      "original_height": "756px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/f674b15c629a.png",
+      "caption": "",
+      "source": "FoodDocs",
+      "original_width": "1240px",
+      "original_height": "1754px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/8b514e22b797.jpg",
+      "caption": "",
+      "source": "Unilever Food Solutions UK",
+      "original_width": "1280px",
+      "original_height": "905px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/e998a639432c.jpg",
+      "caption": "",
+      "source": "Trust20",
+      "original_width": "1600px",
+      "original_height": "1067px"
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+🚀 Initializing Z-AI SDK...
+🔎 Searching images: "corporate social responsibility CSR ESG"
+✅ Got 5 images
+{
+  "success": true,
+  "query": "corporate social responsibility CSR ESG",
+  "count": 5,
+  "ranked": false,
+  "results": [
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/1ed8b0c65b91.jpeg",
+      "caption": "",
+      "source": "The Sustainable Agency",
+      "original_width": "2000px",
+      "original_height": "1000px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/c5a90e080f5d.jpg",
+      "caption": "",
+      "source": "LinkedIn",
+      "original_width": "1000px",
+      "original_height": "1500px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/51e31ee76afa.png",
+      "caption": "",
+      "source": "All Things IC",
+      "original_width": "2990px",
+      "original_height": "1696px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/0a5ae54e13d5.jpg",
+      "caption": "",
+      "source": "Plastic Detox",
+      "original_width": "1080px",
+      "original_height": "826px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/e42f670f4656.png",
+      "caption": "",
+      "source": "ESG Global Advisors",
+      "original_width": "1246px",
+      "original_height": "784px"
+    }
+  ]
+}

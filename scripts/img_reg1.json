@@ -1,0 +1,46 @@
+🚀 Initializing Z-AI SDK...
+🔎 Searching images: "labor law regulation workplace compliance inspector"
+✅ Got 5 images
+{
+  "success": true,
+  "query": "labor law regulation workplace compliance inspector",
+  "count": 5,
+  "ranked": false,
+  "results": [
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/ecbbd7f5cd7a.jpg",
+      "caption": "",
+      "source": "GotSafety.com",
+      "original_width": "1214px",
+      "original_height": "867px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/2e38e734c90b.jpg",
+      "caption": "",
+      "source": "LinkedIn",
+      "original_width": "800px",
+      "original_height": "1200px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/f12f9472350c.jpg",
+      "caption": "",
+      "source": "The HIPAA Journal",
+      "original_width": "1369px",
+      "original_height": "799px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/a7e528ac844b.jpg",
+      "caption": "",
+      "source": "Cart2India Online",
+      "original_width": "1500px",
+      "original_height": "1500px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/e9f0bfb333fa.png",
+      "caption": "",
+      "source": "California Office of the Small Business Advocate (CalOSBA) - CA.gov",
+      "original_width": "1600px",
+      "original_height": "500px"
+    }
+  ]
+}

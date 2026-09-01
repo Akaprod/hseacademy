@@ -1,0 +1,46 @@
+🚀 Initializing Z-AI SDK...
+🔎 Searching images: "QHSE integrated management system audit"
+✅ Got 5 images
+{
+  "success": true,
+  "query": "QHSE integrated management system audit",
+  "count": 5,
+  "ranked": false,
+  "results": [
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/1150d1a28f83.jpg",
+      "caption": "",
+      "source": "LinkedIn",
+      "original_width": "800px",
+      "original_height": "1122px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/59640f807922.jpg",
+      "caption": "",
+      "source": "USQC",
+      "original_width": "1024px",
+      "original_height": "1536px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/0a5b23aab310.jpg",
+      "caption": "",
+      "source": "Scribd",
+      "original_width": "768px",
+      "original_height": "1024px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/6d9dbd376622.jpg",
+      "caption": "",
+      "source": "Omnex Systems",
+      "original_width": "1275px",
+      "original_height": "1650px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/695c0267645b.png",
+      "caption": "",
+      "source": "Optimiso Group",
+      "original_width": "1160px",
+      "original_height": "864px"
+    }
+  ]
+}

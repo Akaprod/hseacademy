@@ -1,0 +1,32 @@
+🚀 Initializing Z-AI SDK...
+🔎 Searching images: "ISO 9001 quality management certification"
+✅ Got 3 images
+{
+  "success": true,
+  "query": "ISO 9001 quality management certification",
+  "count": 3,
+  "ranked": false,
+  "results": [
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/060ead72c449.jpeg",
+      "caption": "",
+      "source": "Medium",
+      "original_width": "1400px",
+      "original_height": "1429px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/2f7648871ece.jpg",
+      "caption": "",
+      "source": "Quality Gurus Inc.",
+      "original_width": "1600px",
+      "original_height": "1132px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/e62110d67ef4.jpg",
+      "caption": "",
+      "source": "Bloomto",
+      "original_width": "2480px",
+      "original_height": "3509px"
+    }
+  ]
+}

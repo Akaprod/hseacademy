@@ -1,0 +1,46 @@
+🚀 Initializing Z-AI SDK...
+🔎 Searching images: "industrial hygiene chemical safety laboratory PPE"
+✅ Got 5 images
+{
+  "success": true,
+  "query": "industrial hygiene chemical safety laboratory PPE",
+  "count": 5,
+  "ranked": false,
+  "results": [
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/9e1db6eb967d.jpeg",
+      "caption": "",
+      "source": "Office of the Vice Chancellor for Research - CU Anschutz",
+      "original_width": "4032px",
+      "original_height": "3024px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/1c7d00ef8acd.png",
+      "caption": "",
+      "source": "tradesafe",
+      "original_width": "1800px",
+      "original_height": "1000px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/652b74bce719.jpg",
+      "caption": "",
+      "source": "Respirex International",
+      "original_width": "1370px",
+      "original_height": "1150px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/294977335ecb.jpg",
+      "caption": "",
+      "source": "Safety Partners",
+      "original_width": "2560px",
+      "original_height": "1707px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/5d8132cb2a2c.jpg",
+      "caption": "",
+      "source": "YUMPU",
+      "original_width": "1200px",
+      "original_height": "1549px"
+    }
+  ]
+}

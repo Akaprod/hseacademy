@@ -1,0 +1,46 @@
+🚀 Initializing Z-AI SDK...
+🔎 Searching images: "PDCA Deming cycle continuous improvement quality"
+✅ Got 5 images
+{
+  "success": true,
+  "query": "PDCA Deming cycle continuous improvement quality",
+  "count": 5,
+  "ranked": false,
+  "results": [
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/babcd746f49b.png",
+      "caption": "",
+      "source": "Flevy.com",
+      "original_width": "1024px",
+      "original_height": "768px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/60608b8c9d38.png",
+      "caption": "",
+      "source": "Pearl Academy",
+      "original_width": "1024px",
+      "original_height": "768px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/139f3b22d2ce.png",
+      "caption": "",
+      "source": "Businessmap",
+      "original_width": "1127px",
+      "original_height": "713px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/ad42b287445f.png",
+      "caption": "",
+      "source": "Scilife",
+      "original_width": "1200px",
+      "original_height": "675px"
+    },
+    {
+      "original_url": "https://sfile.chatglm.cn/images-ppt/ac46d8f1c2eb.png",
+      "caption": "",
+      "source": "qmBase",
+      "original_width": "1080px",
+      "original_height": "1080px"
+    }
+  ]
+}

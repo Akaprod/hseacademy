@@ -6,7 +6,7 @@ import {
   LayoutDashboard, FileText, Award, GraduationCap, FolderOpen, File,
   Menu, MessageSquare, Mail, Users, Star, Shield, ChevronLeft, ChevronRight,
   Plus, Pencil, Trash2, Search, Eye, EyeOff, Check, X, Clock,
-  TrendingUp, BarChart3, LogOut, ArrowLeft,
+  TrendingUp, BarChart3, LogOut, ArrowLeft, Lock,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -2054,26 +2054,50 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
               <TableBody>
                 {users.length === 0 ? (
                   <TableRow><TableCell colSpan={5} className="text-center py-8 text-slate-400">Aucun utilisateur</TableCell></TableRow>
-                ) : users.map((u: any) => (
+                ) : users.map((u: any) => {
+                  const isRoot = !!u.isRoot;
+                  return (
                   <TableRow key={u.id} className="hover:bg-slate-50">
-                    <TableCell className="font-medium">{u.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {u.name}
+                        {isRoot && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300" title="Compte ROOT administrateur — protégé contre suppression et rétrogradation">
+                            <Shield className="h-3 w-3" /> ROOT
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell className="hidden md:table-cell text-sm text-slate-600">{u.email}</TableCell>
                     <TableCell>
-                      <Select value={u.role} onValueChange={(v) => updateUserRole(u.id, v)}>
-                        <SelectTrigger className="w-28 h-8"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="user">Utilisateur</SelectItem>
-                          <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="editor">Éditeur</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      {isRoot ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 italic px-2 py-1" title="Le rôle du compte ROOT ne peut pas être modifié">
+                          <Lock className="h-3 w-3" /> {u.role}
+                        </span>
+                      ) : (
+                        <Select value={u.role} onValueChange={(v) => updateUserRole(u.id, v)}>
+                          <SelectTrigger className="w-28 h-8"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="user">Utilisateur</SelectItem>
+                            <SelectItem value="admin">Admin</SelectItem>
+                            <SelectItem value="editor">Éditeur</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
                     </TableCell>
                     <TableCell className="hidden sm:table-cell text-sm text-slate-500">{formatDate(u.createdAt)}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-700" onClick={() => deleteUser(u.id)}><Trash2 className="h-4 w-4" /></Button>
+                      {isRoot ? (
+                        <span className="inline-flex items-center justify-center h-8 w-8 text-slate-300" title="Le compte ROOT ne peut pas être supprimé">
+                          <Lock className="h-4 w-4" />
+                        </span>
+                      ) : (
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-700" onClick={() => deleteUser(u.id)}><Trash2 className="h-4 w-4" /></Button>
+                      )}
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </Card>

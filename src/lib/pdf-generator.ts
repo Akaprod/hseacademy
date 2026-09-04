@@ -91,9 +91,12 @@ export async function generateAttestationPdf(data: AttestationPdfData): Promise<
 
   // --- Créer le document PDF ---
   // pdfkit supports custom page size as [width, height]
+  // IMPORTANT : layoutBuffer = false empêche pdfkit d'ajouter une page blanche
+  // en fin de document. Le PDF fait EXACTEMENT 1 page A4.
   const doc = new PDFDocument({
     size: [PAGE_W, PAGE_H],
     margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN },
+    bufferPages: false,
     info: {
       Title: `Attestation ${data.serialNumber}`,
       Author: 'HSE Academy',
@@ -132,15 +135,17 @@ export async function generateAttestationPdf(data: AttestationPdfData): Promise<
     .undash();
 
   // --- Watermark discret HSE Academy (très léger) ---
+  // IMPORTANT : lineBreak: false + width large enough pour éviter
+  // que pdfkit n'ajoute une page blanche supplémentaire.
   doc.save();
   doc.translate(PAGE_W / 2, PAGE_H / 2);
   doc.rotate(-45);
   doc
     .fillColor(COLOR_EMERALD)
     .opacity(0.04)
-    .fontSize(80)
+    .fontSize(60)
     .font('Helvetica-Bold')
-    .text('HSE ACADEMY', { align: 'center', width: 700, anchor: 'center' });
+    .text('HSE ACADEMY', 0, 0, { align: 'center', width: 400, lineBreak: false });
   doc.opacity(1);
   doc.restore();
 
@@ -344,14 +349,14 @@ export async function generateAttestationPdf(data: AttestationPdfData): Promise<
     .fillColor(COLOR_EMERALD_DARK)
     .text(data.serialNumber, rightX, identY + 13, { align: 'center', width: colW });
 
-  y += 38;
+  y += 32;
 
   // --- QR CODE + VÉRIFICATION ---
-  const qrSize = 110;
+  const qrSize = 95;
   const qrX = (PAGE_W - qrSize) / 2;
   // Cadre blanc autour du QR
   doc
-    .rect(qrX - 10, y - 10, qrSize + 20, qrSize + 20)
+    .rect(qrX - 8, y - 8, qrSize + 16, qrSize + 16)
     .fillColor('#ffffff')
     .lineWidth(1)
     .strokeColor(COLOR_EMERALD)
@@ -359,7 +364,7 @@ export async function generateAttestationPdf(data: AttestationPdfData): Promise<
 
   doc.image(qrPngBuffer, qrX, y, { width: qrSize, height: qrSize });
 
-  y += qrSize + 18;
+  y += qrSize + 14;
 
   doc
     .fillColor(COLOR_EMERALD_DARK)
@@ -370,7 +375,7 @@ export async function generateAttestationPdf(data: AttestationPdfData): Promise<
       characterSpacing: 1.5,
     });
 
-  y += 14;
+  y += 12;
 
   doc
     .fillColor(COLOR_SLATE)
@@ -378,10 +383,12 @@ export async function generateAttestationPdf(data: AttestationPdfData): Promise<
     .fontSize(8.5)
     .text(verifyUrl, PAGE_W / 2, y, { align: 'center' });
 
-  y += 30;
-
-  // --- SIGNATURES (zone en bas) ---
-  const sigY = PAGE_H - MARGIN - 90;
+  // --- SIGNATURES (zone en bas, position fixe) ---
+  // Must be above footerY (which is now PAGE_H - MARGIN - 50 = 735.89)
+  // sigY + 18 (text height) must be < footerY - 10 (spacing)
+  // sigY < 735.89 - 10 - 18 = 707.89
+  // PAGE_H - MARGIN - 100 = 685.89 — safe
+  const sigY = PAGE_H - MARGIN - 100;
   const sigColW = (PAGE_W - 2 * MARGIN - 60) / 2;
 
   // Ligne + label "La Direction"
@@ -414,7 +421,10 @@ export async function generateAttestationPdf(data: AttestationPdfData): Promise<
     .text('HSE Academy — Institut QHSE', rightX, sigY + 18, { align: 'center', width: sigColW });
 
   // --- FOOTER ---
-  const footerY = PAGE_H - MARGIN - 22;
+  // IMPORTANT : pdfkit adds a new page when text is placed beyond
+  // the bottom margin. We keep ALL footer text well within bounds.
+  // Use a single text call with line break to avoid multi-page issues.
+  const footerY = PAGE_H - MARGIN - 40;
   doc
     .moveTo(MARGIN + 30, footerY)
     .lineTo(PAGE_W - MARGIN - 30, footerY)
@@ -422,26 +432,16 @@ export async function generateAttestationPdf(data: AttestationPdfData): Promise<
     .strokeColor(COLOR_EMERALD)
     .stroke();
 
+  // Single text block for footer (avoids pdfkit auto-page-break)
   doc
     .fillColor(COLOR_SLATE_LIGHT)
     .font('Helvetica')
     .fontSize(7)
     .text(
-      'HSE Academy — Institut International des Compétences Professionnelles QHSE',
-      PAGE_W / 2,
+      `HSE Academy — Institut International des Compétences Professionnelles QHSE\nDocument officiel — N° ${data.serialNumber} — Vérifiable sur hseacademy.online/verify/${data.serialNumber}`,
+      MARGIN,
       footerY + 6,
-      { align: 'center', width: PAGE_W - 2 * MARGIN }
-    );
-
-  doc
-    .fillColor(COLOR_SLATE_LIGHT)
-    .font('Helvetica')
-    .fontSize(6.5)
-    .text(
-      `Document officiel — N° ${data.serialNumber} — Vérifiable sur hseacademy.online/verify/${data.serialNumber}`,
-      PAGE_W / 2,
-      footerY + 16,
-      { align: 'center', width: PAGE_W - 2 * MARGIN }
+      { align: 'center', width: PAGE_W - 2 * MARGIN, lineBreak: true }
     );
 
   // --- Mention si révoquée ---

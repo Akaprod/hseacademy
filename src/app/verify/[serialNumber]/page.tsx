@@ -187,7 +187,7 @@ function ValidState({ attestation }: { attestation: PublicAttestation }) {
             <ShieldCheck className="h-9 w-9 text-white" />
           </div>
           <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-            ATTESTATION AUTHENTIQUE
+            ✓ Document authentique
           </h1>
           <p className="text-emerald-100 text-sm mt-1">
             Ce document a été vérifié et confirmé par HSE Academy
@@ -197,11 +197,11 @@ function ValidState({ attestation }: { attestation: PublicAttestation }) {
         {/* Données */}
         <div className="p-6 sm:p-8">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <InfoField icon={<HashIcon />} label="Numéro de série" value={attestation.serialNumber} mono />
-            <InfoField icon={<User className="h-4 w-4" />} label="Bénéficiaire" value={attestation.fullName} />
+            <InfoField icon={<HashIcon />} label="Attestation N°" value={attestation.serialNumber} mono />
+            <InfoField icon={<User className="h-4 w-4" />} label="Titulaire" value={attestation.fullName} />
             <InfoField icon={<BookOpen className="h-4 w-4" />} label="Formation" value={attestation.courseName} full />
             <InfoField icon={<Percent className="h-4 w-4" />} label="Score" value={`${attestation.overallScore}%`} />
-            <InfoField icon={<Calendar className="h-4 w-4" />} label="Date d&apos;émission" value={formatDate(attestation.issuedDate)} />
+            <InfoField icon={<Calendar className="h-4 w-4" />} label="Date de délivrance" value={formatDate(attestation.issuedDate)} />
             <InfoField
               icon={<ShieldCheck className="h-4 w-4" />}
               label="Statut"
@@ -248,19 +248,19 @@ function RevokedState({ attestation }: { attestation: PublicAttestation }) {
           <ShieldAlert className="h-9 w-9 text-white" />
         </div>
         <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-          ATTESTATION RÉVOQUÉE
+          ⚠ Document révoqué
         </h1>
         <p className="text-amber-100 text-sm mt-1">
-          Cette attestation a été officiellement révoquée par HSE Academy
+          Cette attestation a été délivrée par l&apos;IICP mais n&apos;est plus considérée comme valide.
         </p>
       </div>
 
       <div className="p-6 sm:p-8">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <InfoField icon={<HashIcon />} label="Numéro de série" value={attestation.serialNumber} mono />
-          <InfoField icon={<User className="h-4 w-4" />} label="Bénéficiaire" value={attestation.fullName} />
+          <InfoField icon={<HashIcon />} label="Attestation N°" value={attestation.serialNumber} mono />
+          <InfoField icon={<User className="h-4 w-4" />} label="Titulaire" value={attestation.fullName} />
           <InfoField icon={<BookOpen className="h-4 w-4" />} label="Formation" value={attestation.courseName} full />
-          <InfoField icon={<Calendar className="h-4 w-4" />} label="Date d&apos;émission" value={formatDate(attestation.issuedDate)} />
+          <InfoField icon={<Calendar className="h-4 w-4" />} label="Date de délivrance" value={formatDate(attestation.issuedDate)} />
           <InfoField
             icon={<ShieldAlert className="h-4 w-4" />}
             label="Statut"
@@ -312,7 +312,7 @@ function InvalidState({ serialNumber }: { serialNumber: string }) {
           <ShieldX className="h-9 w-9 text-white" />
         </div>
         <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-          ATTESTATION INVALIDE
+          ✕ Document invalide
         </h1>
         <p className="text-red-100 text-sm mt-1">
           Le document ne correspond pas aux données officielles enregistrées
@@ -348,10 +348,10 @@ function NotFoundState({ serialNumber }: { serialNumber: string }) {
           <ShieldX className="h-9 w-9 text-white" />
         </div>
         <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-          ATTESTATION INTROUVABLE
+          ✕ Document non trouvé
         </h1>
         <p className="text-slate-200 text-sm mt-1">
-          Aucune attestation enregistrée ne correspond à ce numéro
+          Aucun document authentique ne correspond à ce numéro de série.
         </p>
       </div>
       <div className="p-6 sm:p-8">

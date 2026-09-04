@@ -367,6 +367,27 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
   ];
 
   // ============================================================
+  // DÉFENSE EN PROFONDEUR — vérifier au mount que l'user est bien admin côté serveur
+  // (au cas où page.tsx aurait été contourné)
+  // ============================================================
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/auth/me', { cache: 'no-store' });
+        const data = await res.json();
+        if (cancelled) return;
+        if (!data.user || data.user.role !== 'admin') {
+          onNavigate('home');
+        }
+      } catch {
+        if (!cancelled) onNavigate('home');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [onNavigate]);
+
+  // ============================================================
   // API HELPER
   // ============================================================
 

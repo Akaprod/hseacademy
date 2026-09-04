@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { requireAdmin } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -35,6 +36,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  // Protection C4 : réservé à un admin authentifié
+  const auth = await requireAdmin();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const body = await request.json();
     const article = await db.article.create({ data: body });

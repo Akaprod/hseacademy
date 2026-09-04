@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
-import { GraduationCap, Menu, X, Phone, Mail, Shield, BookOpen, Award, FileCheck, Users, ChevronDown, Settings, MonitorPlay } from 'lucide-react';
+import { GraduationCap, Menu, X, Phone, Mail, Shield, BookOpen, Award, FileCheck, Users, ChevronDown, Settings, MonitorPlay, UserCircle } from 'lucide-react';
 
 interface HeaderProps {
   currentPage: string;
@@ -138,6 +138,10 @@ export default function Header({ currentPage, onNavigate, onAuthOpen, user, onLo
                     Admin
                   </Button>
                 )}
+                <Button variant="ghost" size="sm" onClick={() => onNavigate('profile')} className="text-slate-600 gap-1.5">
+                  <UserCircle className="h-4 w-4" />
+                  Profil
+                </Button>
                 <Button variant="outline" size="sm" onClick={onLogout} className="text-slate-600">
                   Déconnexion
                 </Button>
@@ -208,6 +212,9 @@ export default function Header({ currentPage, onNavigate, onAuthOpen, user, onLo
                             <div className="text-xs text-slate-500">{user.email}</div>
                           </div>
                         </div>
+                        <Button variant="outline" className="w-full" onClick={() => { onNavigate('profile'); setMobileOpen(false); }}>
+                          <UserCircle className="h-4 w-4 mr-2" /> Profil
+                        </Button>
                         <Button variant="outline" className="w-full" onClick={() => { onLogout(); setMobileOpen(false); }}>
                           Déconnexion
                         </Button>

@@ -23,6 +23,8 @@ model User {
   certifications Certification[]
   enrollments    Enrollment[]
   attestations   CourseAttestation[]
+  profile        UserProfile?
+  emailTokens    EmailVerificationToken[]
 }
 
 model Category {
@@ -260,4 +262,72 @@ model CourseAttestation {
   issuedDate      DateTime @default(now())
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  // AT-P2 : gestion du statut et de la révocation
+  status          String   @default("valid") // valid, revoked
+  revokedAt       DateTime?
+  revokedReason   String?
+  revokedBy       String?  // User id de l'admin qui a révoqué (référence souple, pas de relation Prisma pour éviter conflit avec user)
+
+  // AT-P5 : numéro de série public professionnel (non prédictible) + signature cryptographique
+  serialNumber    String   @unique
+  signatureHash   String
+}
+
+// ============================================================================
+// PROFIL — Couche 2 : identité personnelle/professionnelle
+// ============================================================================
+
+model UserProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Identité
+  fullName        String?  // Nom complet validé (séparé de User.name)
+  fullNameValidated Boolean @default(false)
+  fullNameOriginal String? // Snapshot du nom original au moment de la validation
+  fullNameHistory  String   @default("[]") // JSON array: [{old, new, date, by, reason}]
+  birthDate       DateTime?
+  birthPlace      String?
+  residence       String?
+  address         String?
+
+  // Photo de profil (facultative)
+  avatar          String?
+
+  // Réseaux sociaux
+  facebook        String?
+  linkedin        String?
+  twitter         String?
+  website         String?
+
+  // Vérification
+  emailVerified   Boolean  @default(false)
+  emailVerifiedAt DateTime?
+  phoneVerified   Boolean  @default(false)
+  phoneVerifiedAt DateTime?
+  phoneCountry    String?  // Code pays ISO (ex: "MA")
+  phoneNormalized String?  @unique // Format E.164 +2126XXXXXXXX
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// ============================================================================
+// VÉRIFICATION EMAIL — tokens à usage unique avec expiration
+// ============================================================================
+
+model EmailVerificationToken {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token       String   @unique  // Hash du token (pas le token brut)
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
 }

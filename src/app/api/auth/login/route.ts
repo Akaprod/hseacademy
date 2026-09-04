@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import bcrypt from 'bcryptjs';
+import { setSessionCookie } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,6 +21,9 @@ export async function POST(request: NextRequest) {
     if (!isValid) {
       return NextResponse.json({ error: 'Email ou mot de passe incorrect' }, { status: 401 });
     }
+
+    // Pose le cookie httpOnly signé
+    await setSessionCookie(user.id);
 
     const { password: _, ...userWithoutPassword } = user;
     return NextResponse.json({ user: userWithoutPassword });

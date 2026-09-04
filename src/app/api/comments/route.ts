@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { requireUser } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,16 +22,22 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  // H2 : Authentification obligatoire. body.userId est ignoré —
+  // le commentaire est toujours créé au nom de l'utilisateur connecté.
+  const auth = await requireUser();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const body = await request.json();
-    const { content, articleId, userId } = body;
+    const { content, articleId } = body;
 
-    if (!content || !articleId || !userId) {
-      return NextResponse.json({ error: 'Contenu, articleId et userId requis' }, { status: 400 });
+    if (!content || !articleId) {
+      return NextResponse.json({ error: 'Contenu et articleId requis' }, { status: 400 });
     }
 
+    // userId vient de la session serveur, jamais du body
     const comment = await db.comment.create({
-      data: { content, articleId, userId, status: 'approved' },
+      data: { content, articleId, userId: auth.id, status: 'approved' },
       include: { user: { select: { name: true, avatar: true } } },
     });
 

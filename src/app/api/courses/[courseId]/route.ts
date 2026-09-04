@@ -10,9 +10,26 @@ export async function GET(
     const userId = new URL(req.url).searchParams.get('userId');
 
     // Try by ID first, then by slug
-    let course = await db.onlineCourse.findUnique({ where: { id: courseId } });
+    // Inclure chapters (nécessaire pour la vue learn du frontend)
+    let course = await db.onlineCourse.findUnique({
+      where: { id: courseId },
+      include: {
+        chapters: {
+          select: { id: true, title: true, order: true },
+          orderBy: { order: 'asc' },
+        },
+      },
+    });
     if (!course) {
-      course = await db.onlineCourse.findUnique({ where: { slug: courseId } });
+      course = await db.onlineCourse.findUnique({
+        where: { slug: courseId },
+        include: {
+          chapters: {
+            select: { id: true, title: true, order: true },
+            orderBy: { order: 'asc' },
+          },
+        },
+      });
     }
 
     if (!course) {

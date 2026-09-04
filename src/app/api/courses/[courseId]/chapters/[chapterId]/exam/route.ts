@@ -1,17 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { requireUser } from '@/lib/auth';
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ courseId: string; chapterId: string }> }
 ) {
+  // H3 : Authentification obligatoire. body.userId est ignoré —
+  // le résultat d'examen est toujours enregistré pour l'utilisateur connecté.
+  const auth = await requireUser();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const { courseId, chapterId } = await params;
-    const { userId, answers } = await req.json(); // answers: { [questionId]: selectedOptionIndex }
-
-    if (!userId) {
-      return NextResponse.json({ error: 'Utilisateur non identifié' }, { status: 401 });
-    }
+    // userId vient de la session serveur, jamais du body
+    const userId = auth.id;
+    // body.answers: { [questionId]: selectedOptionIndex } — seul champ légitime du body
+    const { answers } = await req.json();
 
     const chapter = await db.chapter.findFirst({
       where: { id: chapterId, courseId },
@@ -26,7 +31,7 @@ export async function POST(
     const totalQuestions = questions.length;
     let correctCount = 0;
     const results = questions.map((q) => {
-      const userAnswer = answers[q.id] ?? -1;
+      const userAnswer = answers?.[q.id] ?? -1;
       const isCorrect = userAnswer === q.correctIndex;
       if (isCorrect) correctCount++;
       return {
@@ -41,7 +46,7 @@ export async function POST(
     const score = Math.round((correctCount / totalQuestions) * 100);
     const passed = score >= 60;
 
-    // Update enrollment
+    // Update enrollment — la logique métier existante est conservée à l'identique
     const enrollment = await db.enrollment.findUnique({
       where: { userId_courseId: { userId, courseId } },
     });

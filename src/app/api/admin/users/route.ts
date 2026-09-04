@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
+import { requireAdmin } from '@/lib/auth';
 export async function GET(request: NextRequest) {
+    const auth = await requireAdmin();
+    if (auth instanceof NextResponse) return auth;
   try {
     const url = request.nextUrl.searchParams;
     const page = parseInt(url.get('page') || '1');
@@ -24,6 +27,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+    const auth = await requireAdmin();
+    if (auth instanceof NextResponse) return auth;
   try {
     const body = await request.json();
     const { id, role } = body;

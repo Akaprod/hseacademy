@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
+import { requireAdmin } from '@/lib/auth';
 export async function GET(request: NextRequest) {
+    const auth = await requireAdmin();
+    if (auth instanceof NextResponse) return auth;
   try {
     const formations = await db.formation.findMany({ orderBy: { order: 'asc' } });
     return NextResponse.json({ formations });
@@ -11,6 +14,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+    const auth = await requireAdmin();
+    if (auth instanceof NextResponse) return auth;
   try {
     const body = await request.json();
     const { title, slug, shortDescription, fullDescription, level, duration, prerequisites, objectives, program, price, mode, coverImage, featured, order } = body;

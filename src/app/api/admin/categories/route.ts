@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
+import { requireAdmin } from '@/lib/auth';
 export async function GET() {
+    const auth = await requireAdmin();
+    if (auth instanceof NextResponse) return auth;
   try {
     const categories = await db.category.findMany({
       orderBy: { order: 'asc' },
@@ -14,6 +17,8 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+    const auth = await requireAdmin();
+    if (auth instanceof NextResponse) return auth;
   try {
     const body = await request.json();
     const { name, slug, description, color, order } = body;

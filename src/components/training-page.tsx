@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   BookOpen, Play, CheckCircle, Clock, Users, Award, ArrowLeft, ArrowRight,
   Trophy, XCircle, ChevronRight, GraduationCap, Star, FileCheck, Lock,
-  CircleCheck, AlertCircle, Menu, X, Sparkles
+  CircleCheck, AlertCircle, Menu, X, Sparkles, ExternalLink
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -66,7 +66,7 @@ interface ExamResult {
 }
 
 interface Attestation {
-  id: string; attestationNo: string; fullName: string; courseName: string;
+  id: string; attestationNo: string; serialNumber?: string; fullName: string; courseName: string;
   overallScore: number; issuedDate: string;
   course: { title: string; slug: string; level: string; totalHours: string };
 }
@@ -99,6 +99,8 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
   /* progress tracking (in-memory from enrollment) */
   const [completedChapters, setCompletedChapters] = useState<Set<string>>(new Set());
   const [chapterScores, setChapterScores] = useState<Record<string, { score: number; total: number; passed: boolean }>>({});
+  /* état d'inscription en cours (pour désactiver le bouton pendant l'appel API) */
+  const [enrolling, setEnrolling] = useState(false);
 
   /* ---- fetch courses ---- */
   const fetchCourses = useCallback(async () => {
@@ -107,7 +109,12 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
       const q = user ? `?userId=${user.id}` : '';
       const res = await fetch(`/api/courses${q}`);
       const data = await res.json();
-      setCourses(data);
+      // Garde : si la réponse n'est pas un array (erreur serveur), ne pas crasher
+      if (Array.isArray(data)) {
+        setCourses(data);
+      } else {
+        setCourses([]);
+      }
     } catch { toast.error('Erreur de chargement des cours'); }
     setLoading(false);
   }, [user]);
@@ -146,6 +153,13 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
 
   const enroll = async (courseId: string) => {
     if (!requireAuth() || !selectedCourse) return;
+    // Si l'utilisateur est déjà inscrit (enrollment déjà présent), ne pas appeler /enroll
+    // — on passe directement à startLearning (mode reprise).
+    if (selectedCourse.enrollment) {
+      startLearning();
+      return;
+    }
+    setEnrolling(true);
     try {
       const res = await fetch(`/api/courses/${courseId}/enroll`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -153,16 +167,44 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
       });
       if (res.ok) {
         toast.success('Inscription réussie !');
-        fetchCourses(); // refresh to get enrollment data
-        // reload the course detail
-        const detailRes = await fetch(`/api/courses/${selectedCourse.slug}?userId=${user!.id}`);
-        if (detailRes.ok) setSelectedCourse(await detailRes.json());
+        fetchCourses(); // refresh catalog (non-bloquant)
+        // La réponse de POST /enroll contient déjà l'enrollment complet.
+        // On met à jour selectedCourse en MERGEANT l'enrollment dans l'objet
+        // existant — SANS remplacer chapters (qui viendrait du détail API
+        // qui ne les inclut pas).
+        const enrollmentData = await res.json();
+        setSelectedCourse({
+          ...selectedCourse,
+          enrollment: {
+            id: enrollmentData.id,
+            status: enrollmentData.status,
+            currentChapter: enrollmentData.currentChapter,
+            completedChapters: enrollmentData.completedChapters || [],
+            overallScore: enrollmentData.overallScore || 0,
+          },
+        });
+        // Démarre l'apprentissage avec les données cohérentes
+        // (selectedCourse a encore ses chapters originaux)
+        startLearning();
+      } else {
+        try {
+          const errData = await res.json();
+          toast.error(errData?.error || 'Erreur lors de l\'inscription');
+        } catch {
+          toast.error('Erreur lors de l\'inscription');
+        }
       }
     } catch { toast.error('Erreur lors de l\'inscription'); }
+    setEnrolling(false);
   };
 
   const startLearning = async () => {
     if (!selectedCourse) return;
+    // Garde : si le cours n'a pas de chapitres, ne pas crasher sur chapters[0]
+    if (!selectedCourse.chapters || selectedCourse.chapters.length === 0) {
+      toast.error('Ce cours n\'a pas encore de contenu disponible');
+      return;
+    }
     try {
       const res = await fetch(`/api/courses/${selectedCourse.id}/chapters/${selectedCourse.chapters[0].id}?userId=${user?.id || ''}`);
       if (res.ok) {
@@ -170,6 +212,8 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
         setChapters([ch]);
         setCurrentChapterIdx(0);
         setView('learn');
+      } else {
+        toast.error('Erreur de chargement du chapitre');
       }
     } catch { toast.error('Erreur de chargement'); }
   };
@@ -261,9 +305,9 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
   };
 
   const currentChapter = chapters[currentChapterIdx];
-  const progressPercent = selectedCourse && selectedCourse.chapters.length > 0
+  const progressPercent = selectedCourse && selectedCourse.chapters && selectedCourse.chapters.length > 0
     ? Math.round((completedChapters.size / selectedCourse.chapters.length) * 100) : 0;
-  const allPassed = selectedCourse
+  const allPassed = selectedCourse && selectedCourse.chapters && selectedCourse.chapters.length > 0
     ? selectedCourse.chapters.every((ch) => completedChapters.has(ch.id))
     : false;
 
@@ -466,8 +510,8 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
                   </div>
 
                   {!enrolled ? (
-                    <Button className="w-full" size="lg" onClick={() => enroll(selectedCourse.id)}>
-                      <Play className="h-4 w-4 mr-2" /> S'inscrire gratuitement
+                    <Button className="w-full" size="lg" onClick={() => enroll(selectedCourse.id)} disabled={enrolling || loading}>
+                      <Play className="h-4 w-4 mr-2" /> {enrolling ? 'Inscription...' : 'S\'inscrire gratuitement'}
                     </Button>
                   ) : (
                     <>
@@ -504,10 +548,27 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
   /*  LEARNING VIEW (chapter reader)                                    */
   /* ================================================================ */
   if (view === 'learn' && currentChapter && selectedCourse) {
+    // Garde défensive : si selectedCourse.chapters n'est pas disponible
+    // (par ex. après un refresh d'état qui a écrasé les chapters),
+    // ne pas crasher sur chapters[idx+1]
+    const chapters = selectedCourse.chapters;
+    if (!chapters || chapters.length === 0) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-white">
+          <div className="text-center">
+            <AlertCircle className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+            <p className="text-slate-500">Chargement du cours en cours…</p>
+            <Button variant="outline" className="mt-4" onClick={() => setView('detail')}>
+              Retour au cours
+            </Button>
+          </div>
+        </div>
+      );
+    }
     const ch = currentChapter;
     const idx = currentChapterIdx;
-    const nextCh = selectedCourse.chapters[idx + 1];
-    const prevCh = selectedCourse.chapters[idx - 1];
+    const nextCh = chapters[idx + 1];
+    const prevCh = chapters[idx - 1];
     const hasPassed = chapterScores[ch.id]?.passed || false;
 
     return (
@@ -528,7 +589,7 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400">{idx + 1}/{selectedCourse.chapters.length}</span>
+              <span className="text-xs text-slate-400">{idx + 1}/{chapters.length}</span>
               <Progress value={progressPercent} className="w-20 h-2" />
             </div>
           </div>
@@ -540,7 +601,7 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
             <div className="p-4">
               <h3 className="font-bold text-sm text-slate-900 mb-3">Chapitres</h3>
               <div className="space-y-1">
-                {selectedCourse.chapters.map((c, i) => {
+                {chapters.map((c, i) => {
                   const active = c.id === ch.id;
                   const done = completedChapters.has(c.id);
                   return (
@@ -562,7 +623,7 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
           <main className="flex-1 min-w-0">
             <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
               <div className="mb-6">
-                <Badge variant="outline" className="mb-3">Chapitre {idx + 1} sur {selectedCourse.chapters.length}</Badge>
+                <Badge variant="outline" className="mb-3">Chapitre {idx + 1} sur {chapters.length}</Badge>
                 <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-2">{ch.title}</h1>
               </div>
 
@@ -598,7 +659,7 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
                 <Button variant="outline" onClick={() => prevCh ? loadChapter(prevCh.id, idx - 1) : setView('detail')} disabled={!prevCh}>
                   <ArrowLeft className="h-4 w-4 mr-1" /> Précédent
                 </Button>
-                <span className="text-sm text-slate-400">{idx + 1} / {selectedCourse.chapters.length}</span>
+                <span className="text-sm text-slate-400">{idx + 1} / {chapters.length}</span>
                 <Button variant="outline" onClick={() => nextCh ? loadChapter(nextCh.id, idx + 1) : setView('detail')} disabled={!nextCh}>
                   Suivant <ArrowRight className="h-4 w-4 ml-1" />
                 </Button>
@@ -683,7 +744,7 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
   /*  EXAM RESULT VIEW                                                 */
   /* ================================================================ */
   if (view === 'examResult' && examResult && currentChapter && selectedCourse) {
-    const isLastChapter = currentChapterIdx === selectedCourse.chapters.length - 1;
+    const isLastChapter = currentChapterIdx === chapters.length - 1;
     return (
       <div className="min-h-screen bg-slate-50">
         <div className="max-w-3xl mx-auto px-4 py-8">
@@ -763,7 +824,7 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
             )}
             {examResult.passed && !isLastChapter && (
               <Button onClick={() => {
-                const next = selectedCourse.chapters[currentChapterIdx + 1];
+                const next = chapters[currentChapterIdx + 1];
                 if (next) loadChapter(next.id, currentChapterIdx + 1);
               }}>
                 Chapitre suivant <ArrowRight className="h-4 w-4 ml-1" />
@@ -852,6 +913,27 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
                 <p className="text-xs text-slate-400 mt-6">
                   Vérifiable en ligne sur hseacademy.online
                 </p>
+
+                {/* AT-P3 : Bouton Télécharger PDF officiel */}
+                <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <a
+                    href={`/api/courses/attestations/${att.id}/pdf`}
+                    download={`attestation-${att.attestationNo}.pdf`}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm"
+                  >
+                    <FileCheck className="h-4 w-4" />
+                    Télécharger l'attestation PDF
+                  </a>
+                  <a
+                    href={`/verify/${att.serialNumber || att.attestationNo}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 border border-emerald-300 hover:border-emerald-500 hover:bg-emerald-50 text-emerald-700 text-sm font-semibold rounded-lg transition-colors"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Page de vérification publique
+                  </a>
+                </div>
               </div>
             </div>
           </div>
@@ -902,6 +984,15 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
                           <span>Score : <strong className="text-emerald-600">{att.overallScore}%</strong></span>
                           <span>{new Date(att.issuedDate).toLocaleDateString('fr-FR')}</span>
                         </div>
+                        <a
+                          href={`/api/courses/attestations/${att.id}/pdf`}
+                          download={`attestation-${att.attestationNo}.pdf`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1.5 mt-3 text-xs font-medium text-emerald-700 hover:text-emerald-800"
+                        >
+                          <FileCheck className="h-3.5 w-3.5" />
+                          Télécharger le PDF officiel
+                        </a>
                       </div>
                       <ChevronRight className="h-5 w-5 text-slate-300" />
                     </div>

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
+import { requireAdmin } from '@/lib/auth';
 export async function GET(request: NextRequest) {
+    const auth = await requireAdmin();
+    if (auth instanceof NextResponse) return auth;
   try {
     const url = request.nextUrl.searchParams;
     const status = url.get('status') || '';

@@ -7,13 +7,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { LogIn, UserPlus, Mail, Lock, User, Phone } from 'lucide-react';
+import { LogIn, UserPlus, Mail, Lock, User, Phone, AlertCircle } from 'lucide-react';
 
 interface AuthModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   mode: 'login' | 'register';
-  onAuthSuccess: (user: { id: string; name: string; email: string; role: string }) => void;
+  onAuthSuccess: () => void;
 }
 
 export default function AuthModal({ open, onOpenChange, mode, onAuthSuccess }: AuthModalProps) {
@@ -22,6 +22,7 @@ export default function AuthModal({ open, onOpenChange, mode, onAuthSuccess }: A
   const [registerName, setRegisterName] = useState('');
   const [registerEmail, setRegisterEmail] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
+  const [registerConfirmPassword, setRegisterConfirmPassword] = useState('');
   const [registerPhone, setRegisterPhone] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -37,7 +38,7 @@ export default function AuthModal({ open, onOpenChange, mode, onAuthSuccess }: A
       const data = await res.json();
       if (res.ok) {
         toast.success(`Bienvenue, ${data.user.name} !`);
-        onAuthSuccess(data.user);
+        onAuthSuccess();
         onOpenChange(false);
       } else {
         toast.error(data.error);
@@ -48,18 +49,28 @@ export default function AuthModal({ open, onOpenChange, mode, onAuthSuccess }: A
 
   const handleRegister = async () => {
     if (!registerName || !registerEmail || !registerPassword) { toast.error('Veuillez remplir tous les champs obligatoires'); return; }
-    if (registerPassword.length < 6) { toast.error('Le mot de passe doit contenir au moins 6 caractères'); return; }
+    if (registerPassword !== registerConfirmPassword) { toast.error('Les mots de passe ne correspondent pas'); return; }
     setLoading(true);
     try {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: registerName, email: registerEmail, password: registerPassword, phone: registerPhone || null }),
+        body: JSON.stringify({
+          name: registerName,
+          email: registerEmail,
+          password: registerPassword,
+          confirmPassword: registerConfirmPassword,
+          phone: registerPhone || null,
+          phoneCountry: 'MA',
+        }),
       });
       const data = await res.json();
       if (res.ok) {
         toast.success('Compte créé avec succès ! Bienvenue.');
-        onAuthSuccess(data.user);
+        if (data.emailVerificationSent) {
+          toast.info('Un email de vérification vous a été envoyé. Vérifiez votre dossier Spam si nécessaire.');
+        }
+        onAuthSuccess();
         onOpenChange(false);
       } else {
         toast.error(data.error);
@@ -70,15 +81,15 @@ export default function AuthModal({ open, onOpenChange, mode, onAuthSuccess }: A
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-center">
             {mode === 'login' ? 'Connexion' : 'Créer un compte'}
           </DialogTitle>
           <DialogDescription className="text-center text-slate-500">
             {mode === 'login'
-              ? 'Accédez à votre espace personnel IICP'
-              : 'Rejoignez la communauté IICP'}
+              ? 'Accédez à votre espace personnel HSE Academy'
+              : 'Rejoignez la communauté HSE Academy'}
           </DialogDescription>
         </DialogHeader>
         <Tabs defaultValue={mode} className="mt-2">
@@ -115,6 +126,13 @@ export default function AuthModal({ open, onOpenChange, mode, onAuthSuccess }: A
                 <Input id="reg-name" placeholder="Votre nom complet" value={registerName} onChange={(e) => setRegisterName(e.target.value)} className="pl-10" />
               </div>
             </div>
+            {/* Avertissement nom */}
+            <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-800">
+                Vérifiez attentivement l&apos;orthographe de votre nom complet. Il sera utilisé sur vos attestations de formation.
+              </p>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="reg-email">Email *</Label>
               <div className="relative">
@@ -133,7 +151,17 @@ export default function AuthModal({ open, onOpenChange, mode, onAuthSuccess }: A
               <Label htmlFor="reg-password">Mot de passe *</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input id="reg-password" type="password" placeholder="Min. 6 caractères" value={registerPassword} onChange={(e) => setRegisterPassword(e.target.value)} className="pl-10" onKeyDown={(e) => e.key === 'Enter' && handleRegister()} />
+                <Input id="reg-password" type="password" placeholder="Min. 8 caractères" value={registerPassword} onChange={(e) => setRegisterPassword(e.target.value)} className="pl-10" />
+              </div>
+              <p className="text-xs text-slate-400">
+                Min. 8 caractères, 1 majuscule, 1 minuscule, 1 chiffre, 1 caractère spécial
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reg-confirm-password">Confirmer le mot de passe *</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input id="reg-confirm-password" type="password" placeholder="••••••••" value={registerConfirmPassword} onChange={(e) => setRegisterConfirmPassword(e.target.value)} className="pl-10" onKeyDown={(e) => e.key === 'Enter' && handleRegister()} />
               </div>
             </div>
             <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleRegister} disabled={loading}>

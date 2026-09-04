@@ -7,6 +7,10 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
+  experimental: {
+    // CageFS limite les process forks — 1 worker suffit
+    cpus: 1,
+  },
 };
 
 export default nextConfig;

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
+import { requireAdmin } from '@/lib/auth';
 export async function GET() {
+    const auth = await requireAdmin();
+    if (auth instanceof NextResponse) return auth;
   try {
     const testimonials = await db.testimonial.findMany({ orderBy: { createdAt: 'desc' } });
     return NextResponse.json({ testimonials });
@@ -11,6 +14,8 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+    const auth = await requireAdmin();
+    if (auth instanceof NextResponse) return auth;
   try {
     const body = await request.json();
     const { name, role, company, content, avatar, rating, featured } = body;

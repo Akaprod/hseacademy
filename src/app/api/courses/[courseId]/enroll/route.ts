@@ -1,22 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { requireUser } from '@/lib/auth';
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ courseId: string }> }
 ) {
+  // H3 : Authentification obligatoire. body.userId est ignoré —
+  // l'inscription est toujours créée pour l'utilisateur connecté.
+  const auth = await requireUser();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const { courseId } = await params;
-    const { userId } = await req.json();
-
-    if (!userId) {
-      return NextResponse.json({ error: 'Utilisateur non identifié' }, { status: 401 });
-    }
 
     const course = await db.onlineCourse.findUnique({ where: { id: courseId } });
     if (!course) {
       return NextResponse.json({ error: 'Cours non trouvé' }, { status: 404 });
     }
+
+    // userId vient de la session serveur, jamais du body
+    const userId = auth.id;
 
     const existing = await db.enrollment.findUnique({
       where: { userId_courseId: { userId, courseId } },

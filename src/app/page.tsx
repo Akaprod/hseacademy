@@ -116,7 +116,7 @@ export default function Page() {
       case 'training':
         return <TrainingPage user={user} onAuthOpen={handleAuthOpen} onNavigate={handleNavigate} />;
       case 'profile':
-        return <ProfilePage user={user} onNavigate={handleNavigate} onLogout={handleLogout} />;
+        return <ProfilePage user={user} onNavigate={handleNavigate} onLogout={handleLogout} initialTab={pageData.tab} />;
       case 'admin':
         return isAdmin
           ? <AdminDashboard user={user} onNavigate={handleNavigate} onLogout={handleLogout} />

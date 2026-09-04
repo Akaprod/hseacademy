@@ -43,6 +43,7 @@ interface ProfilePageProps {
   user: { id: string; name: string; email: string; role: string } | null;
   onNavigate: (page: string, data?: Record<string, string>) => void;
   onLogout: () => void;
+  initialTab?: string;
 }
 
 interface UserProfile {
@@ -177,10 +178,15 @@ function getProgressPercent(enrollment: Enrollment): number {
 // MAIN COMPONENT
 // ============================================================================
 
-export default function ProfilePage({ user, onNavigate, onLogout }: ProfilePageProps) {
+export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: ProfilePageProps) {
   const [data, setData] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('account');
+  const [activeTab, setActiveTab] = useState(initialTab || 'account');
+
+  // Sync tab when initialTab changes (e.g., navigating from header dropdown)
+  useEffect(() => {
+    if (initialTab) setActiveTab(initialTab);
+  }, [initialTab]);
 
   // --- Champs Identité ---
   const [fullName, setFullName] = useState('');

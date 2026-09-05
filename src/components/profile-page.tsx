@@ -34,6 +34,7 @@ import {
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PaymentStatusBadge, PrintPaymentModal } from '@/components/payment-components';
 
 // ============================================================================
 // TYPES
@@ -182,6 +183,9 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
   const [data, setData] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(initialTab || 'account');
+  const [coursePayments, setCoursePayments] = useState<any[]>([]);
+  const [printPayments, setPrintPayments] = useState<any[]>([]);
+  const [printModalAttId, setPrintModalAttId] = useState<string | null>(null);
 
   // Sync tab when initialTab changes (e.g., navigating from header dropdown)
   useEffect(() => {
@@ -258,6 +262,21 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
   const profile = data?.profile || null;
   const enrollments = data?.enrollments || [];
   const attestations = data?.attestations || [];
+
+  // Fetch payments
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      try {
+        const [cpRes, ppRes] = await Promise.all([
+          fetch('/api/courses/payments'),
+          fetch('/api/attestations/printed'),
+        ]);
+        if (cpRes.ok) setCoursePayments(await cpRes.json());
+        if (ppRes.ok) setPrintPayments(await ppRes.json());
+      } catch { /* ignore */ }
+    })();
+  }, [user]);
 
   const emailVerified = !!profile?.emailVerified;
   const phoneVerified = !!profile?.phoneVerified;
@@ -1033,8 +1052,67 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
               </CardContent>
             </Card>
           </TabsContent>
+        {/* ============================ F: Mes paiements ============================ */}
+          <TabsContent value="payments" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Award className="h-5 w-5" /> Mes paiements
+                </CardTitle>
+                <CardDescription>Paiements de cours et attestations imprimées</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {coursePayments.length === 0 && printPayments.length === 0 ? (
+                  <p className="text-sm text-slate-500 text-center py-8">Aucun paiement enregistré</p>
+                ) : (
+                  <>
+                    {coursePayments.map((p: any) => (
+                      <div key={p.id} className="flex items-center justify-between p-3 border border-slate-200 rounded-lg">
+                        <div>
+                          <p className="text-sm font-medium text-slate-900">{p.enrollment?.course?.title || 'Cours'}</p>
+                          <p className="text-xs text-slate-500">{p.method === 'bank_transfer' ? 'Virement' : 'PayPal'} — {p.amount} MAD</p>
+                        </div>
+                        <PaymentStatusBadge status={p.status} />
+                      </div>
+                    ))}
+                    {printPayments.map((p: any) => (
+                      <div key={p.id} className="flex items-center justify-between p-3 border border-slate-200 rounded-lg">
+                        <div>
+                          <p className="text-sm font-medium text-slate-900">Attestation imprimée</p>
+                          <p className="text-xs text-slate-500">{p.method === 'bank_transfer' ? 'Virement' : 'PayPal'} — {p.amount} MAD</p>
+                        </div>
+                        <PaymentStatusBadge status={p.status} />
+                      </div>
+                    ))}
+                  </>
+                )}
+
+                {/* Print payment button for validated attestations */}
+                {attestations.filter(a => a.status === 'valid').length > 0 && (
+                  <div className="pt-3 border-t border-slate-200">
+                    <p className="text-sm font-medium text-slate-700 mb-2">Demander une attestation imprimée (190 MAD)</p>
+                    <div className="space-y-2">
+                      {attestations.filter(a => a.status === 'valid').map((att: any) => (
+                        <Button key={att.id} variant="outline" size="sm" onClick={() => setPrintModalAttId(att.id)}>
+                          <Award className="h-3 w-3 mr-1" /> {att.courseName || att.course?.title || 'Attestation'}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
+      {printModalAttId && (
+        <PrintPaymentModal
+          open={!!printModalAttId}
+          onOpenChange={(v) => !v && setPrintModalAttId(null)}
+          attestationId={printModalAttId}
+          onSuccess={() => { setPrintModalAttId(null); }}
+        />
+      )}
     </div>
   );
 }

@@ -19,12 +19,14 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  comments       Comment[]
-  certifications Certification[]
-  enrollments    Enrollment[]
-  attestations   CourseAttestation[]
-  profile        UserProfile?
-  emailTokens    EmailVerificationToken[]
+  comments          Comment[]
+  certifications    Certification[]
+  enrollments       Enrollment[]
+  attestations      CourseAttestation[]
+  profile           UserProfile?
+  emailTokens       EmailVerificationToken[]
+  coursePayments    CoursePayment[]
+  attestationPayments AttestationPayment[]
 }
 
 model Category {
@@ -245,6 +247,12 @@ model Enrollment {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
+  // Phase 3 — Payment system
+  courseOrderIndex Int       @default(0)  // 1 = first course (free), 2+ = paid
+  paymentStatus    String    @default("not_required") // not_required|pending|submitted|validated|rejected
+
+  coursePayment    CoursePayment?
+
   @@unique([userId, courseId])
 }
 
@@ -330,4 +338,77 @@ model EmailVerificationToken {
   createdAt   DateTime @default(now())
 
   @@index([userId])
+}
+
+// ============================================================================
+// PHASE 3 — PAIEMENT COURS (120 MAD pour cours 2+)
+// ============================================================================
+
+model CoursePayment {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enrollmentId      String    @unique
+  enrollment        Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  courseId          String
+
+  amount            Float     // 120.0
+  currency          String    @default("MAD")
+  method            String    // bank_transfer | paypal
+
+  status            String    @default("pending")
+  // pending | submitted | validated | rejected | cancelled
+
+  // Preuve de paiement (fichier stocké sur filesystem privé)
+  proofPath         String?
+  proofOriginalName String?
+  proofMimeType     String?
+  proofSize         Int?
+
+  submittedAt       DateTime?
+  validatedAt       DateTime?
+  validatedBy       String?   // User id de l'admin (référence souple)
+  rejectionReason   String?
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([courseId])
+}
+
+// ============================================================================
+// PHASE 3 — PAIEMENT ATTESTATION IMPRIMÉE (190 MAD, optionnel)
+// ============================================================================
+
+model AttestationPayment {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attestationId     String
+
+  amount            Float     // 190.0
+  currency          String    @default("MAD")
+  method            String    // bank_transfer | paypal
+
+  status            String    @default("pending")
+  // pending | submitted | validated | rejected | cancelled
+
+  proofPath         String?
+  proofOriginalName String?
+  proofMimeType     String?
+  proofSize         Int?
+
+  submittedAt       DateTime?
+  validatedAt       DateTime?
+  validatedBy       String?
+  rejectionReason   String?
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([attestationId])
+  @@index([status])
 }

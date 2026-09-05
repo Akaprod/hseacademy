@@ -15,9 +15,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   BookOpen, Play, CheckCircle, Clock, Users, Award, ArrowLeft, ArrowRight,
   Trophy, XCircle, ChevronRight, GraduationCap, Star, FileCheck, Lock,
-  CircleCheck, AlertCircle, Menu, X, Sparkles, ExternalLink
+  CircleCheck, AlertCircle, Menu, X, Sparkles, ExternalLink, CreditCard
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { PaymentModal, PaymentStatusBadge } from '@/components/payment-components';
 
 interface UserData {
   id: string;
@@ -42,7 +43,7 @@ interface Course {
   chapters: ChapterSummary[];
   _count: { enrollments: number; attestations: number };
   enrollment?: {
-    id: string; status: string; currentChapter: number;
+    id: string; status: string; currentChapter: number; courseOrderIndex: number; paymentStatus: string;
     completedChapters: string[]; overallScore: number;
   } | null;
 }
@@ -95,6 +96,7 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
   /* attestations */
   const [attestations, setAttestations] = useState<Attestation[]>([]);
   const [currentAttestation, setCurrentAttestation] = useState<Attestation | null>(null);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
 
   /* progress tracking (in-memory from enrollment) */
   const [completedChapters, setCompletedChapters] = useState<Set<string>>(new Set());
@@ -181,6 +183,8 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
             currentChapter: enrollmentData.currentChapter,
             completedChapters: enrollmentData.completedChapters || [],
             overallScore: enrollmentData.overallScore || 0,
+            courseOrderIndex: enrollmentData.courseOrderIndex || 0,
+            paymentStatus: enrollmentData.paymentStatus || "not_required",
           },
         });
         // Démarre l'apprentissage avec les données cohérentes
@@ -505,13 +509,13 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
                     <Separator />
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-slate-600">Prix</span>
-                      <span className="font-bold text-emerald-700 text-lg">Gratuit</span>
+                      <span className="font-bold text-emerald-700 text-lg">{selectedCourse.enrollment?.courseOrderIndex === 1 ? 'Gratuit' : '120 MAD'}</span>
                     </div>
                   </div>
 
                   {!enrolled ? (
                     <Button className="w-full" size="lg" onClick={() => enroll(selectedCourse.id)} disabled={enrolling || loading}>
-                      <Play className="h-4 w-4 mr-2" /> {enrolling ? 'Inscription...' : 'S\'inscrire gratuitement'}
+                      <Play className="h-4 w-4 mr-2" /> {enrolling ? 'Inscription...' : 'S\'inscrire — 120 MAD'}
                     </Button>
                   ) : (
                     <>
@@ -524,9 +528,20 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
                         </div>
                       )}
                       {allPassed ? (
-                        <Button className="w-full" size="lg" variant="outline" onClick={requestAttestation}>
-                          <Award className="h-4 w-4 mr-2" /> Obtenir mon attestation
-                        </Button>
+                        selectedCourse.enrollment?.paymentStatus === 'validated' || selectedCourse.enrollment?.paymentStatus === 'not_required' ? (
+                          <Button className="w-full" size="lg" variant="outline" onClick={requestAttestation}>
+                            <Award className="h-4 w-4 mr-2" /> Obtenir mon attestation
+                          </Button>
+                        ) : (
+                          <div className="space-y-2">
+                            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 text-center">
+                              Votre cours est terminé. L'attestation sera disponible après validation du paiement.
+                            </div>
+                            <Button className="w-full" size="lg" onClick={() => setPaymentModalOpen(true)}>
+                              <CreditCard className="h-4 w-4 mr-2" /> Payer 120 MAD
+                            </Button>
+                          </div>
+                        )
                       ) : (
                         <Button className="w-full" size="lg" onClick={startLearning}>
                           <Play className="h-4 w-4 mr-2" />
@@ -831,9 +846,15 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
               </Button>
             )}
             {examResult.passed && isLastChapter && allPassed && (
-              <Button onClick={requestAttestation} className="bg-emerald-600 hover:bg-emerald-700">
-                <Award className="h-4 w-4 mr-1" /> Obtenir mon attestation
-              </Button>
+              selectedCourse?.enrollment?.paymentStatus === "validated" || selectedCourse?.enrollment?.paymentStatus === "not_required" ? (
+                <Button onClick={requestAttestation} className="bg-emerald-600 hover:bg-emerald-700">
+                  <Award className="h-4 w-4 mr-1" /> Obtenir mon attestation
+                </Button>
+              ) : (
+                <Button onClick={() => setPaymentModalOpen(true)} className="bg-amber-600 hover:bg-amber-700">
+                  <CreditCard className="h-4 w-4 mr-1" /> Payer 120 MAD
+                </Button>
+              )
             )}
             {examResult.passed && isLastChapter && !allPassed && (
               <Button variant="outline" onClick={() => setView('detail')}>
@@ -945,6 +966,18 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
   /* ================================================================ */
   /*  MY ATTESTATIONS VIEW                                             */
   /* ================================================================ */
+  // Payment modal render
+  const paymentModal = paymentModalOpen && selectedCourse?.enrollment ? (
+    <PaymentModal
+      open={paymentModalOpen}
+      onOpenChange={setPaymentModalOpen}
+      enrollmentId={selectedCourse.enrollment.id}
+      courseTitle={selectedCourse.title}
+      amount={120}
+      onSuccess={() => { fetchCourses(); }}
+    />
+  ) : null;
+
   if (view === 'myAttestations') {
     return (
       <div className="min-h-screen bg-slate-50">
@@ -1007,4 +1040,6 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
   }
 
   return null;
+
+  {paymentModal}
 }

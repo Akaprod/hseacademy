@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { requireUser } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const userId = searchParams.get('userId');
     const level = searchParams.get('level');
 
     const where: Record<string, unknown> = { published: true };
@@ -29,6 +29,17 @@ export async function GET(req: NextRequest) {
       orderBy: [{ order: 'asc' }, { createdAt: 'desc' }],
     });
 
+    // IDOR FIX (Phase 3) : utiliser auth.id au lieu de searchParams.userId
+    let userId: string | null = null;
+    try {
+      const auth = await requireUser();
+      if (!(auth instanceof NextResponse)) {
+        userId = auth.id;
+      }
+    } catch {
+      // Non authentifié — pas d'enrollment
+    }
+
     let enriched = courses;
     if (userId) {
       enriched = await Promise.all(
@@ -45,6 +56,8 @@ export async function GET(req: NextRequest) {
                   currentChapter: enrollment.currentChapter,
                   completedChapters: JSON.parse(enrollment.completedChapters),
                   overallScore: enrollment.overallScore,
+                  courseOrderIndex: enrollment.courseOrderIndex,
+                  paymentStatus: enrollment.paymentStatus,
                 }
               : null,
           };

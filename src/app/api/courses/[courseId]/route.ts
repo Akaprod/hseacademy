@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { requireUser } from '@/lib/auth';
 
 export async function GET(
   req: NextRequest,
@@ -7,10 +8,7 @@ export async function GET(
 ) {
   try {
     const { courseId } = await params;
-    const userId = new URL(req.url).searchParams.get('userId');
 
-    // Try by ID first, then by slug
-    // Inclure chapters (nécessaire pour la vue learn du frontend)
     let course = await db.onlineCourse.findUnique({
       where: { id: courseId },
       include: {
@@ -36,18 +34,40 @@ export async function GET(
       return NextResponse.json({ error: 'Cours non trouvé' }, { status: 404 });
     }
 
-    let enrollment = null;
-    if (userId) {
-      enrollment = await db.enrollment.findUnique({
-        where: { userId_courseId: { userId, courseId: course.id } },
-      });
-      if (enrollment) {
-        enrollment = {
-          ...enrollment,
-          completedChapters: JSON.parse(enrollment.completedChapters),
-          chapterScores: JSON.parse(enrollment.chapterScores),
-        };
+    // IDOR FIX : utiliser auth.id au lieu de searchParams.userId
+    let enrollment: {
+      id: string;
+      status: string;
+      currentChapter: number;
+      courseOrderIndex: number;
+      paymentStatus: string;
+      completedChapters: unknown;
+      chapterScores: unknown;
+      overallScore: number;
+      startedAt: Date;
+      completedAt: Date | null;
+      createdAt: Date;
+      updatedAt: Date;
+      userId: string;
+      courseId: string;
+    } | null = null;
+
+    try {
+      const auth = await requireUser();
+      if (!(auth instanceof NextResponse)) {
+        const rawEnrollment = await db.enrollment.findUnique({
+          where: { userId_courseId: { userId: auth.id, courseId: course.id } },
+        });
+        if (rawEnrollment) {
+          enrollment = {
+            ...rawEnrollment,
+            completedChapters: JSON.parse(rawEnrollment.completedChapters),
+            chapterScores: JSON.parse(rawEnrollment.chapterScores),
+          };
+        }
       }
+    } catch {
+      // Non authentifié — pas d'enrollment
     }
 
     return NextResponse.json({ ...course, enrollment });

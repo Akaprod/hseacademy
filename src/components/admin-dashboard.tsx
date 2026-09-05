@@ -6,7 +6,7 @@ import {
   LayoutDashboard, FileText, Award, GraduationCap, FolderOpen, File,
   Menu, MessageSquare, Mail, Users, Star, Shield, ChevronLeft, ChevronRight,
   Plus, Pencil, Trash2, Search, Eye, EyeOff, Check, X, Clock,
-  TrendingUp, BarChart3, LogOut, ArrowLeft, Lock,
+  TrendingUp, BarChart3, LogOut, ArrowLeft, Lock, CreditCard, FileCheck,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -64,7 +64,7 @@ interface OverviewStats {
   totalTestimonials: number; totalPages: number; totalMenus: number;
 }
 
-type Section = 'dashboard' | 'articles' | 'certifications' | 'formations' | 'categories' | 'pages' | 'menus' | 'comments' | 'newsletter' | 'contacts' | 'users' | 'testimonials';
+type Section = 'dashboard' | 'articles' | 'certifications' | 'formations' | 'categories' | 'pages' | 'menus' | 'comments' | 'newsletter' | 'contacts' | 'users' | 'testimonials' | 'payments';
 
 interface NavItem {
   id: Section;
@@ -333,6 +333,9 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
   const [users, setUsers] = useState<any[]>([]);
   const [usersTotal, setUsersTotal] = useState(0);
   const [usersPages, setUsersPages] = useState(1);
+  const [payments, setPayments] = useState<any[]>([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [paymentsTotal, setPaymentsTotal] = useState(0);
   const [usersPage, setUsersPage] = useState(1);
   const [usersLoading, setUsersLoading] = useState(false);
 
@@ -364,6 +367,7 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
     { id: 'contacts', label: 'Messages', icon: Mail },
     { id: 'users', label: 'Utilisateurs', icon: Users },
     { id: 'testimonials', label: 'Témoignages', icon: Star },
+    { id: 'payments', label: 'Paiements', icon: CreditCard },
   ];
 
   // ============================================================
@@ -2033,6 +2037,112 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
     }
   };
 
+  const fetchPayments = useCallback(async () => {
+    setPaymentsLoading(true);
+    try {
+      const res = await api('/api/admin/payments?page=1&limit=50');
+      const data = await res.json();
+      setPayments(data.payments || []);
+      setPaymentsTotal(data.total || 0);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Erreur');
+    } finally {
+      setPaymentsLoading(false);
+    }
+  }, [api]);
+
+  useEffect(() => { if (section === 'payments') fetchPayments(); }, [section, fetchPayments]);
+
+  const validatePayment = async (id: string, type: string) => {
+    try {
+      await api(`/api/admin/payments/${id}`, { method: 'PATCH', body: JSON.stringify({ action: 'validate', type }) });
+      toast.success('Paiement validé');
+      fetchPayments();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Erreur');
+    }
+  };
+
+  const rejectPayment = async (id: string, type: string) => {
+    const reason = window.prompt('Motif du refus ?');
+    if (!reason) return;
+    try {
+      await api(`/api/admin/payments/${id}`, { method: 'PATCH', body: JSON.stringify({ action: 'reject', type, rejectionReason: reason }) });
+      toast.success('Paiement refusé');
+      fetchPayments();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Erreur');
+    }
+  };
+
+  const renderPayments = () => (
+    <div>
+      <SectionHeader title="Paiements" />
+      {paymentsLoading ? <LoadingSkeleton /> : (
+        <>
+          <div className="text-sm text-slate-500 mb-2">{paymentsTotal} paiement(s)</div>
+          <Card>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Utilisateur</TableHead>
+                  <TableHead className="hidden md:table-cell">Type</TableHead>
+                  <TableHead>Montant</TableHead>
+                  <TableHead>Méthode</TableHead>
+                  <TableHead>Statut</TableHead>
+                  <TableHead className="hidden sm:table-cell">Date</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {payments.length === 0 ? (
+                  <TableRow><TableCell colSpan={7} className="text-center py-8 text-slate-400">Aucun paiement</TableCell></TableRow>
+                ) : payments.map((p: any) => (
+                  <TableRow key={p.id}>
+                    <TableCell className="font-medium">{p.user?.name || '—'}</TableCell>
+                    <TableCell className="hidden md:table-cell text-sm">{p.type === 'course' ? 'Cours' : 'Impression'}</TableCell>
+                    <TableCell className="text-sm">{p.amount} MAD</TableCell>
+                    <TableCell className="text-sm">{p.method === 'bank_transfer' ? 'Virement' : 'PayPal'}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={
+                        p.status === 'validated' ? 'bg-emerald-100 text-emerald-800' :
+                        p.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                        p.status === 'submitted' ? 'bg-blue-100 text-blue-800' :
+                        'bg-amber-100 text-amber-800'
+                      }>{p.status}</Badge>
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell text-sm text-slate-500">{formatDate(p.createdAt)}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        {p.proofPath && (
+                          <a href={`/api/admin/payments/${p.id}/proof?type=${p.type}`} target="_blank" rel="noopener noreferrer">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-500" title="Voir la preuve">
+                              <FileCheck className="h-4 w-4" />
+                            </Button>
+                          </a>
+                        )}
+                        {p.status === 'submitted' && (
+                          <>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-500" onClick={() => validatePayment(p.id, p.type)} title="Valider">
+                              <Check className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => rejectPayment(p.id, p.type)} title="Refuser">
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        </>
+      )}
+    </div>
+  );
+
   const renderUsers = () => (
     <div>
       <SectionHeader title="Utilisateurs" />
@@ -2252,6 +2362,7 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
       case 'newsletter': return renderNewsletter();
       case 'contacts': return renderMessages();
       case 'users': return renderUsers();
+      case 'payments': return renderPayments();
       case 'testimonials': return renderTestimonials();
       default: return null;
     }

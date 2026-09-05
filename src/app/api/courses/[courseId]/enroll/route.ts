@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireUser } from '@/lib/auth';
+import { getInitialPaymentStatus } from '@/lib/payment';
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ courseId: string }> }
 ) {
-  // H3 : Authentification obligatoire. body.userId est ignoré —
-  // l'inscription est toujours créée pour l'utilisateur connecté.
   const auth = await requireUser();
   if (auth instanceof NextResponse) return auth;
 
@@ -19,7 +18,6 @@ export async function POST(
       return NextResponse.json({ error: 'Cours non trouvé' }, { status: 404 });
     }
 
-    // userId vient de la session serveur, jamais du body
     const userId = auth.id;
 
     const existing = await db.enrollment.findUnique({
@@ -33,8 +31,21 @@ export async function POST(
       });
     }
 
+    // Phase 3 — Calculer courseOrderIndex côté serveur
+    // Compter les enrollments existants pour cet utilisateur
+    const existingEnrollmentCount = await db.enrollment.count({
+      where: { userId },
+    });
+    const courseOrderIndex = existingEnrollmentCount + 1;
+    const paymentStatus = getInitialPaymentStatus(courseOrderIndex);
+
     const enrollment = await db.enrollment.create({
-      data: { userId, courseId },
+      data: {
+        userId,
+        courseId,
+        courseOrderIndex,
+        paymentStatus,
+      },
     });
 
     return NextResponse.json({

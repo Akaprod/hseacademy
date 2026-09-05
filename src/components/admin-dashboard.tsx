@@ -7,6 +7,7 @@ import {
   Menu, MessageSquare, Mail, Users, Star, Shield, ChevronLeft, ChevronRight,
   Plus, Pencil, Trash2, Search, Eye, EyeOff, Check, X, Clock,
   TrendingUp, BarChart3, LogOut, ArrowLeft, Lock, CreditCard, FileCheck,
+  Settings, Save, Scale, Globe,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -64,7 +65,7 @@ interface OverviewStats {
   totalTestimonials: number; totalPages: number; totalMenus: number;
 }
 
-type Section = 'dashboard' | 'articles' | 'certifications' | 'formations' | 'categories' | 'pages' | 'menus' | 'comments' | 'newsletter' | 'contacts' | 'users' | 'testimonials' | 'payments';
+type Section = 'dashboard' | 'articles' | 'certifications' | 'formations' | 'categories' | 'pages' | 'menus' | 'comments' | 'newsletter' | 'contacts' | 'users' | 'testimonials' | 'payments' | 'legal';
 
 interface NavItem {
   id: Section;
@@ -346,6 +347,18 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
   const [testiForm, setTestiForm] = useState({ name: '', role: '', company: '', content: '', avatar: '', rating: 5, featured: false });
   const [testimonialsLoading, setTestimonialsLoading] = useState(false);
 
+  // Legal Settings
+  const [legalForm, setLegalForm] = useState({
+    legalName: '', commercialName: '', representative: '',
+    address: '', city: '', country: '', phone: '', email: '', website: '',
+    ice: '', rc: '', if: '',
+    authorizationRef: '', authorityName: '',
+    cndpReceipt: '',
+    refundPolicy: '', privacyPolicy: '', termsOfService: '',
+  });
+  const [legalLoading, setLegalLoading] = useState(false);
+  const [legalSaving, setLegalSaving] = useState(false);
+
   // General loading
   const [dashboardLoading, setDashboardLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -368,6 +381,7 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
     { id: 'users', label: 'Utilisateurs', icon: Users },
     { id: 'testimonials', label: 'Témoignages', icon: Star },
     { id: 'payments', label: 'Paiements', icon: CreditCard },
+    { id: 'legal', label: 'Informations Légales', icon: Scale },
   ];
 
   // ============================================================
@@ -631,6 +645,7 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
       case 'contacts': fetchMessages(); break;
       case 'users': fetchUsers(); break;
       case 'testimonials': fetchTestimonials(); break;
+      case 'legal': fetchLegalSettings(); break;
     }
   }, [section]);
 
@@ -2053,6 +2068,65 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
 
   useEffect(() => { if (section === 'payments') fetchPayments(); }, [section, fetchPayments]);
 
+  // ============================================================
+  // LEGAL SETTINGS — Informations juridiques administrables
+  // ============================================================
+
+  const fetchLegalSettings = useCallback(async () => {
+    setLegalLoading(true);
+    try {
+      const res = await api('/api/admin/legal-settings');
+      const data = await res.json();
+      const s = data.settings || {};
+      setLegalForm({
+        legalName: s.legalName || '',
+        commercialName: s.commercialName || '',
+        representative: s.representative || '',
+        address: s.address || '',
+        city: s.city || '',
+        country: s.country || '',
+        phone: s.phone || '',
+        email: s.email || '',
+        website: s.website || '',
+        ice: s.ice || '',
+        rc: s.rc || '',
+        if: s.if || '',
+        authorizationRef: s.authorizationRef || '',
+        authorityName: s.authorityName || '',
+        cndpReceipt: s.cndpReceipt || '',
+        refundPolicy: s.refundPolicy || '',
+        privacyPolicy: s.privacyPolicy || '',
+        termsOfService: s.termsOfService || '',
+      });
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Erreur');
+    } finally {
+      setLegalLoading(false);
+    }
+  }, [api]);
+
+  useEffect(() => { if (section === 'legal') fetchLegalSettings(); }, [section, fetchLegalSettings]);
+
+  const saveLegalSettings = async () => {
+    setLegalSaving(true);
+    try {
+      const res = await api('/api/admin/legal-settings', {
+        method: 'PUT',
+        body: JSON.stringify(legalForm),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Échec de l\'enregistrement');
+      }
+      toast.success('Informations légales enregistrées');
+      fetchLegalSettings();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Erreur');
+    } finally {
+      setLegalSaving(false);
+    }
+  };
+
   const validatePayment = async (id: string, type: string) => {
     try {
       await api(`/api/admin/payments/${id}`, { method: 'PATCH', body: JSON.stringify({ action: 'validate', type }) });
@@ -2349,6 +2423,275 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
   // SECTION ROUTER
   // ============================================================
 
+  const renderLegal = () => {
+    if (legalLoading) {
+      return (
+        <div>
+          <h2 className="text-xl font-semibold mb-4">Informations Légales</h2>
+          <div className="space-y-4">
+            <Skeleton className="h-12 rounded-lg" />
+            <Skeleton className="h-12 rounded-lg" />
+            <Skeleton className="h-12 rounded-lg" />
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div>
+        <div className="flex items-center gap-3 mb-6">
+          <Scale className="h-6 w-6 text-emerald-600" />
+          <div>
+            <h2 className="text-xl font-semibold">Informations Légales</h2>
+            <p className="text-sm text-muted-foreground">
+              Renseignez progressivement les informations officielles de l&apos;établissement.
+              Les champs vides ne sont jamais affichés publiquement. Aucune valeur fictive ne doit être saisie.
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-6 max-w-4xl">
+          {/* Établissement */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Établissement</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="legal-legalName">Raison sociale</Label>
+                <Input
+                  id="legal-legalName"
+                  value={legalForm.legalName}
+                  onChange={(e) => setLegalForm({ ...legalForm, legalName: e.target.value })}
+                  placeholder="Ex : Institut International des Compétences Professionnelles QHSE SARL"
+                />
+              </div>
+              <div>
+                <Label htmlFor="legal-commercialName">Nom commercial</Label>
+                <Input
+                  id="legal-commercialName"
+                  value={legalForm.commercialName}
+                  onChange={(e) => setLegalForm({ ...legalForm, commercialName: e.target.value })}
+                  placeholder="Ex : HSE Academy"
+                />
+              </div>
+              <div>
+                <Label htmlFor="legal-representative">Responsable / Représentant légal</Label>
+                <Input
+                  id="legal-representative"
+                  value={legalForm.representative}
+                  onChange={(e) => setLegalForm({ ...legalForm, representative: e.target.value })}
+                  placeholder="Ex : Prénom Nom"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Coordonnées */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Coordonnées</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <Label htmlFor="legal-address">Adresse</Label>
+                <Input
+                  id="legal-address"
+                  value={legalForm.address}
+                  onChange={(e) => setLegalForm({ ...legalForm, address: e.target.value })}
+                  placeholder="Ex : 123 Rue Example, Quartier"
+                />
+              </div>
+              <div>
+                <Label htmlFor="legal-city">Ville</Label>
+                <Input
+                  id="legal-city"
+                  value={legalForm.city}
+                  onChange={(e) => setLegalForm({ ...legalForm, city: e.target.value })}
+                  placeholder="Ex : Casablanca"
+                />
+              </div>
+              <div>
+                <Label htmlFor="legal-country">Pays</Label>
+                <Input
+                  id="legal-country"
+                  value={legalForm.country}
+                  onChange={(e) => setLegalForm({ ...legalForm, country: e.target.value })}
+                  placeholder="Ex : Maroc"
+                />
+              </div>
+              <div>
+                <Label htmlFor="legal-phone">Téléphone</Label>
+                <Input
+                  id="legal-phone"
+                  value={legalForm.phone}
+                  onChange={(e) => setLegalForm({ ...legalForm, phone: e.target.value })}
+                  placeholder="Ex : +212 6 XX XX XX XX"
+                />
+              </div>
+              <div>
+                <Label htmlFor="legal-email">Email</Label>
+                <Input
+                  id="legal-email"
+                  type="email"
+                  value={legalForm.email}
+                  onChange={(e) => setLegalForm({ ...legalForm, email: e.target.value })}
+                  placeholder="Ex : contact@institutqhse.com"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <Label htmlFor="legal-website">Site web</Label>
+                <Input
+                  id="legal-website"
+                  value={legalForm.website}
+                  onChange={(e) => setLegalForm({ ...legalForm, website: e.target.value })}
+                  placeholder="Ex : https://hseacademy.online"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Identifiants juridiques */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Identifiants juridiques (Maroc)</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="legal-ice">ICE</Label>
+                <Input
+                  id="legal-ice"
+                  value={legalForm.ice}
+                  onChange={(e) => setLegalForm({ ...legalForm, ice: e.target.value })}
+                  placeholder="Identifiant Commun de l'Entreprise"
+                />
+              </div>
+              <div>
+                <Label htmlFor="legal-rc">RC</Label>
+                <Input
+                  id="legal-rc"
+                  value={legalForm.rc}
+                  onChange={(e) => setLegalForm({ ...legalForm, rc: e.target.value })}
+                  placeholder="Registre de Commerce"
+                />
+              </div>
+              <div>
+                <Label htmlFor="legal-if">IF</Label>
+                <Input
+                  id="legal-if"
+                  value={legalForm.if}
+                  onChange={(e) => setLegalForm({ ...legalForm, if: e.target.value })}
+                  placeholder="Identifiant Fiscal"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Autorisation d'exercice */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Autorisation d&apos;exercice (si applicable)</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="legal-authorizationRef">Référence de l&apos;autorisation</Label>
+                <Input
+                  id="legal-authorizationRef"
+                  value={legalForm.authorizationRef}
+                  onChange={(e) => setLegalForm({ ...legalForm, authorizationRef: e.target.value })}
+                  placeholder="Ex : N° d'agrément / numéro de décision"
+                />
+              </div>
+              <div>
+                <Label htmlFor="legal-authorityName">Organisme / Autorité</Label>
+                <Input
+                  id="legal-authorityName"
+                  value={legalForm.authorityName}
+                  onChange={(e) => setLegalForm({ ...legalForm, authorityName: e.target.value })}
+                  placeholder="Ex : Ministère de l'Éducation / Formation professionnelle"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* CNDP */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">CNDP (protection des données)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Label htmlFor="legal-cndpReceipt">Numéro de récépissé CNDP</Label>
+              <Input
+                id="legal-cndpReceipt"
+                value={legalForm.cndpReceipt}
+                onChange={(e) => setLegalForm({ ...legalForm, cndpReceipt: e.target.value })}
+                placeholder="Ex : N° xxx/2026 — laisser vide si non encore obtenu"
+              />
+              <p className="text-xs text-muted-foreground mt-2">
+                À renseigner uniquement si une déclaration CNDP a été effectuée. Ne pas inventer de numéro.
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Contenus des pages légales */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Contenus des pages légales</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Textes complets affichés sur les pages /refund, /privacy, /terms. Peuvent contenir du Markdown simple.
+                Les pages afficheront par défaut un contenu générique si ces champs sont vides.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="legal-refundPolicy">Politique de remboursement</Label>
+                <Textarea
+                  id="legal-refundPolicy"
+                  rows={6}
+                  value={legalForm.refundPolicy}
+                  onChange={(e) => setLegalForm({ ...legalForm, refundPolicy: e.target.value })}
+                  placeholder="Texte complet de la politique de remboursement..."
+                />
+              </div>
+              <div>
+                <Label htmlFor="legal-privacyPolicy">Politique de confidentialité</Label>
+                <Textarea
+                  id="legal-privacyPolicy"
+                  rows={6}
+                  value={legalForm.privacyPolicy}
+                  onChange={(e) => setLegalForm({ ...legalForm, privacyPolicy: e.target.value })}
+                  placeholder="Texte complet de la politique de confidentialité..."
+                />
+              </div>
+              <div>
+                <Label htmlFor="legal-termsOfService">Conditions générales</Label>
+                <Textarea
+                  id="legal-termsOfService"
+                  rows={6}
+                  value={legalForm.termsOfService}
+                  onChange={(e) => setLegalForm({ ...legalForm, termsOfService: e.target.value })}
+                  placeholder="Texte complet des conditions générales..."
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Save */}
+          <div className="sticky bottom-4 flex justify-end bg-background/80 backdrop-blur-sm p-3 rounded-lg border">
+            <Button
+              onClick={saveLegalSettings}
+              disabled={legalSaving}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              {legalSaving ? 'Enregistrement...' : 'Enregistrer les informations légales'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderSection = () => {
     switch (section) {
       case 'dashboard': return renderDashboard();
@@ -2364,6 +2707,7 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
       case 'users': return renderUsers();
       case 'payments': return renderPayments();
       case 'testimonials': return renderTestimonials();
+      case 'legal': return renderLegal();
       default: return null;
     }
   };

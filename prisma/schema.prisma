@@ -412,3 +412,60 @@ model AttestationPayment {
   @@index([attestationId])
   @@index([status])
 }
+
+// ============================================================================
+// LEGAL SETTINGS — Informations juridiques administrables (singleton)
+// ============================================================================
+//
+// Pattern singleton : une seule ligne avec id="default". Tous les champs
+// sont OPTIONAL — l'admin renseigne progressivement ce qu'il possède.
+// Les pages publiques ne doivent JAMAIS afficher un champ vide comme
+// s'il s'agissait d'une information réelle.
+//
+// Champs :
+//   - Établissement (raison sociale, nom commercial, responsable)
+//   - Coordonnées (adresse, ville, pays, téléphone, email, site web)
+//   - Identifiants juridiques marocains (ICE, RC, IF)
+//   - Autorisation (référence + organisme)
+//   - CNDP (référence récépissé, si applicable)
+//   - Textes libres pour les 3 pages légales (remboursement, confidentialité,
+//     conditions) — l'admin peut coller ses propres contenus structurés.
+// ============================================================================
+
+model LegalSettings {
+  id              String   @id @default("default")
+
+  // Établissement
+  legalName       String?  // Raison sociale officielle
+  commercialName  String?  // Nom commercial (si différent)
+  representative  String?  // Responsable / représentant légal
+
+  // Coordonnées
+  address         String?
+  city            String?
+  country         String?
+  phone           String?
+  email           String?
+  website         String?
+
+  // Identifiants juridiques (Maroc)
+  ice             String?  // Identifiant Commun de l'Entreprise
+  rc              String?  // Registre de Commerce
+  if              String?  // Identifiant Fiscal
+
+  // Autorisation d'exercice / agrément (si applicable)
+  authorizationRef String?  // Référence de l'autorisation
+  authorityName   String?  // Organisme / autorité ayant délivré
+
+  // CNDP (Commission Nationale de Contrôle de la Protection des Données Personnelles)
+  cndpReceipt     String?  // Numéro de récépissé CNDP, si déclaré
+
+  // Contenus libres des pages légales (Markdown ou texte simple)
+  // — L'admin peut coller ici le texte complet de chaque politique.
+  refundPolicy    String?
+  privacyPolicy   String?
+  termsOfService  String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}

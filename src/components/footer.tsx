@@ -175,6 +175,18 @@ export default function Footer({ onNavigate }: FooterProps) {
           <p className="text-xs text-slate-500">
             © {new Date().getFullYear()} IICP - Institut International des Compétences Professionnelles QHSE. Tous droits réservés.
           </p>
+          {/* Liens pages légales — routes App Router autonomes (pas via onNavigate) */}
+          <nav className="flex items-center gap-4 text-xs">
+            <a href="/refund" className="text-slate-500 hover:text-emerald-400 transition-colors">
+              Remboursement
+            </a>
+            <a href="/privacy" className="text-slate-500 hover:text-emerald-400 transition-colors">
+              Confidentialité
+            </a>
+            <a href="/terms" className="text-slate-500 hover:text-emerald-400 transition-colors">
+              Conditions
+            </a>
+          </nav>
           <button
             onClick={scrollToTop}
             className="p-2 rounded-lg bg-slate-800 hover:bg-emerald-600 transition-colors"

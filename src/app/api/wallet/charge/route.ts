@@ -3,15 +3,20 @@ import { db } from '@/lib/db';
 import { requireUser } from '@/lib/auth';
 
 // ============================================================================
-// POST /api/wallet/charge — Recharger le wallet
+// POST /api/wallet/charge — Créer une DEMANDE de rechargement (PENDING)
 // ============================================================================
 //
-// Auth : requireUser()
-// Body : { amount: number, method: string }
+// IMPORTANT : Le solde n'est PAS crédité immédiatement.
+// Le client doit d'abord payer (PayPal/virement), envoyer la preuve,
+// et l'admin doit valider la demande. Le solde est crédité uniquement
+// après validation admin.
 //
-// Le montant est déterminé côté serveur (jamais trust du frontend).
-// Crée une transaction "charge" + met à jour le solde.
-// Pour les promotions futures : un bonus peut être ajouté.
+// Flux :
+//   1. Client choisit montant + méthode → demande créée (statut pending)
+//   2. Instructions de paiement affichées (email PayPal / RIB / WhatsApp)
+//   3. Client envoie preuve (via site ou WhatsApp)
+//   4. Admin valide → solde crédité + bonus
+//   5. Si admin refuse → demande annulée
 // ============================================================================
 
 export async function POST(req: NextRequest) {
@@ -29,7 +34,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Validation de la méthode
-    const validMethods = ['paypal', 'stripe', 'bank_transfer'];
+    const validMethods = ['paypal', 'bank_transfer'];
     if (!method || !validMethods.includes(method)) {
       return NextResponse.json({ error: 'Méthode de paiement invalide' }, { status: 400 });
     }
@@ -45,47 +50,65 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Calcul du bonus promotionnel (optionnel, pour utilisation future)
-    // Ex: +5% pour >= 500 MAD, +10% pour >= 1000 MAD
+    // Récupérer les paramètres de paiement pour afficher les instructions
+    const paymentSettings = await db.paymentSettings.findUnique({
+      where: { id: 'default' },
+    });
+
+    // Calcul du bonus promotionnel (pour info uniquement — appliqué à la validation)
     let bonus = 0;
     if (numAmount >= 1000) bonus = numAmount * 0.10;
     else if (numAmount >= 500) bonus = numAmount * 0.05;
 
-    // Transaction de rechargement
+    // Créer la transaction en statut PENDING (ne PAS créditer le solde)
     const transaction = await db.walletTransaction.create({
       data: {
         walletId: wallet.id,
         type: 'charge',
         amount: numAmount,
         paymentMethod: method,
-        description: `Rechargement de ${numAmount} MAD via ${method}`,
+        description: `Demande de rechargement de ${numAmount} MAD via ${method} — EN ATTENTE DE VALIDATION`,
       },
     });
 
-    // Si bonus, créer une transaction bonus séparée
-    if (bonus > 0) {
-      await db.walletTransaction.create({
-        data: {
-          walletId: wallet.id,
-          type: 'bonus',
-          amount: bonus,
-          description: `Bonus de ${bonus} MAD (rechargement ≥ ${numAmount >= 1000 ? '1000' : '500'} MAD)`,
-        },
-      });
-    }
-
-    // Mettre à jour le solde
-    const newBalance = wallet.balance + numAmount + bonus;
-    await db.wallet.update({
-      where: { id: wallet.id },
-      data: { balance: newBalance },
-    });
+    // Préparer les instructions de paiement pour le client
+    const instructions: Record<string, any> = {
+      paypal: {
+        title: 'Paiement PayPal',
+        amount: numAmount,
+        email: paymentSettings?.paypalEmail || 'ouamrhar@gmail.com',
+        steps: [
+          `Connectez-vous à PayPal et envoyez ${numAmount} MAD à l'adresse : ${paymentSettings?.paypalEmail || 'ouamrhar@gmail.com'}`,
+          'Ajoutez en note : "Rechargement Wallet HSE Academy"',
+          'Après le paiement, envoyez la capture d\'écran sur WhatsApp ou téléchargez-la ci-dessous',
+        ],
+      },
+      bank_transfer: {
+        title: 'Virement bancaire',
+        amount: numAmount,
+        bankName: paymentSettings?.bankName || 'À contacter',
+        accountName: paymentSettings?.bankAccountName || 'À contacter',
+        iban: paymentSettings?.bankIban || 'À contacter',
+        swift: paymentSettings?.bankSwift || '',
+        notes: paymentSettings?.bankNotes || '',
+        steps: [
+          `Effectuez un virement de ${numAmount} MAD vers :`,
+          `Banque : ${paymentSettings?.bankName || 'À contacter'}`,
+          `Titulaire : ${paymentSettings?.bankAccountName || 'À contacter'}`,
+          `RIB : ${paymentSettings?.bankIban || 'À contacter'}`,
+          'Après le virement, envoyez la preuve sur WhatsApp ou téléchargez-la ci-dessous',
+        ],
+      },
+    };
 
     return NextResponse.json({
       success: true,
-      newBalance,
-      bonus: bonus > 0 ? bonus : null,
+      pending: true,
+      message: 'Demande de rechargement créée. Suivez les instructions pour payer.',
       transactionId: transaction.id,
+      bonus: bonus > 0 ? bonus : null,
+      instructions: instructions[method] || null,
+      whatsapp: paymentSettings?.whatsappNumber || '+212728986565',
     });
   } catch (error) {
     console.error('POST /api/wallet/charge error:', error);

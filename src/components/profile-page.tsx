@@ -201,6 +201,8 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
   const [chargeAmount, setChargeAmount] = useState('');
   const [chargeMethod, setChargeMethod] = useState('paypal');
   const [charging, setCharging] = useState(false);
+  const [chargeInstructions, setChargeInstructions] = useState<any>(null);
+  const [chargeWhatsapp, setChargeWhatsapp] = useState('');
 
   // Sync tab when initialTab changes (e.g., navigating from header dropdown)
   useEffect(() => {
@@ -296,11 +298,11 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        toast.success(`Wallet rechargé de ${num} MAD${data.bonus ? ` + ${data.bonus} MAD bonus` : ''}`);
-        setWalletBalance(data.newBalance);
-        setChargeAmount('');
-        setChargeModalOpen(false);
-        fetchWallet();
+        // La demande est PENDING — ne pas créditer le solde immédiatement
+        setChargeInstructions(data.instructions);
+        setChargeWhatsapp(data.whatsapp);
+        toast.success('Demande créée — suivez les instructions pour payer');
+        fetchWallet(); // recharger l'historique pour voir la demande pending
       } else {
         toast.error(data.error || 'Échec du rechargement');
       }
@@ -1267,51 +1269,103 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
                 <Wallet className="h-5 w-5 text-emerald-600" /> Recharger mon Wallet
               </DialogTitle>
               <DialogDescription>
-                Choisissez un montant et une méthode de paiement.
+                {chargeInstructions
+                  ? 'Suivez les instructions ci-dessous pour effectuer le paiement.'
+                  : 'Choisissez un montant et une méthode de paiement.'}
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div>
-                <Label htmlFor="charge-amount">Montant (MAD)</Label>
-                <Input
-                  id="charge-amount"
-                  type="number"
-                  min="10"
-                  value={chargeAmount}
-                  onChange={(e) => setChargeAmount(e.target.value)}
-                  placeholder="Ex : 500"
-                />
-                <p className="text-xs text-slate-500 mt-1">Minimum 10 MAD. Bonus à partir de 500 MAD.</p>
-              </div>
-              <div>
-                <Label htmlFor="charge-method">Méthode de paiement</Label>
-                <Select value={chargeMethod} onValueChange={setChargeMethod}>
-                  <SelectTrigger id="charge-method">
-                    <SelectValue placeholder="Choisir..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="paypal">PayPal</SelectItem>
-                    <SelectItem value="bank_transfer">Virement bancaire</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              {chargeAmount && parseFloat(chargeAmount) >= 1000 && (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-                  <p className="text-sm text-emerald-700 font-medium">Bonus : +{((parseFloat(chargeAmount) || 0) * 0.10).toFixed(2)} MAD (10%)</p>
+
+            {chargeInstructions ? (
+              /* ---- ÉTAPE 2 : Instructions de paiement ---- */
+              <div className="space-y-4 py-4">
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                  <p className="font-semibold text-amber-800 mb-2">{chargeInstructions.title}</p>
+                  <div className="space-y-1">
+                    {chargeInstructions.steps.map((step: string, i: number) => (
+                      <p key={i} className="text-sm text-amber-700">
+                        {i + 1}. {step}
+                      </p>
+                    ))}
+                  </div>
                 </div>
-              )}
-              {chargeAmount && parseFloat(chargeAmount) >= 500 && parseFloat(chargeAmount) < 1000 && (
+
+                {chargeInstructions.email && (
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                    <p className="text-sm font-medium text-slate-700">PayPal : {chargeInstructions.email}</p>
+                    <p className="text-xs text-slate-500 mt-1">Envoyez {chargeInstructions.amount} MAD à cette adresse</p>
+                  </div>
+                )}
+
+                {chargeInstructions.iban && (
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-1">
+                    <p className="text-sm font-medium text-slate-700">Banque : {chargeInstructions.bankName}</p>
+                    <p className="text-sm text-slate-600">Titulaire : {chargeInstructions.accountName}</p>
+                    <p className="text-sm font-mono text-slate-700">RIB : {chargeInstructions.iban}</p>
+                    {chargeInstructions.swift && <p className="text-sm text-slate-500">SWIFT : {chargeInstructions.swift}</p>}
+                    {chargeInstructions.notes && <p className="text-xs text-slate-400 mt-1">{chargeInstructions.notes}</p>}
+                  </div>
+                )}
+
                 <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-                  <p className="text-sm text-emerald-700 font-medium">Bonus : +{((parseFloat(chargeAmount) || 0) * 0.05).toFixed(2)} MAD (5%)</p>
+                  <p className="text-sm text-emerald-700 font-medium">Après le paiement :</p>
+                  <p className="text-sm text-emerald-600">Envoyez votre preuve sur WhatsApp : <span className="font-bold">{chargeWhatsapp}</span></p>
+                  <p className="text-xs text-emerald-500 mt-1">Votre solde sera crédité après validation par l'administration.</p>
                 </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              /* ---- ÉTAPE 1 : Choix montant + méthode ---- */
+              <div className="space-y-4 py-4">
+                <div>
+                  <Label htmlFor="charge-amount">Montant (MAD)</Label>
+                  <Input
+                    id="charge-amount"
+                    type="number"
+                    min="10"
+                    value={chargeAmount}
+                    onChange={(e) => setChargeAmount(e.target.value)}
+                    placeholder="Ex : 500"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Minimum 10 MAD. Bonus à partir de 500 MAD.</p>
+                </div>
+                <div>
+                  <Label htmlFor="charge-method">Méthode de paiement</Label>
+                  <Select value={chargeMethod} onValueChange={setChargeMethod}>
+                    <SelectTrigger id="charge-method">
+                      <SelectValue placeholder="Choisir..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="paypal">PayPal</SelectItem>
+                      <SelectItem value="bank_transfer">Virement bancaire</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {chargeAmount && parseFloat(chargeAmount) >= 1000 && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                    <p className="text-sm text-emerald-700 font-medium">Bonus : +{((parseFloat(chargeAmount) || 0) * 0.10).toFixed(2)} MAD (10%)</p>
+                  </div>
+                )}
+                {chargeAmount && parseFloat(chargeAmount) >= 500 && parseFloat(chargeAmount) < 1000 && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                    <p className="text-sm text-emerald-700 font-medium">Bonus : +{((parseFloat(chargeAmount) || 0) * 0.05).toFixed(2)} MAD (5%)</p>
+                  </div>
+                )}
+              </div>
+            )}
+
             <DialogFooter>
-              <Button variant="outline" onClick={() => setChargeModalOpen(false)}>Annuler</Button>
-              <Button onClick={handleCharge} disabled={charging} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-                {charging ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                {charging ? 'Traitement...' : 'Recharger'}
-              </Button>
+              {chargeInstructions ? (
+                <Button onClick={() => { setChargeModalOpen(false); setChargeInstructions(null); setChargeAmount(''); }} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                  J'ai compris
+                </Button>
+              ) : (
+                <>
+                  <Button variant="outline" onClick={() => setChargeModalOpen(false)}>Annuler</Button>
+                  <Button onClick={handleCharge} disabled={charging} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                    {charging ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                    {charging ? 'Traitement...' : 'Continuer'}
+                  </Button>
+                </>
+              )}
             </DialogFooter>
           </DialogContent>
         </Dialog>

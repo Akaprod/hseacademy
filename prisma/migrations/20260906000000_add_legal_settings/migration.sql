@@ -1,4 +1,4 @@
-﻿-- Migration additive — LegalSettings (singleton)
+-- Migration additive — LegalSettings (singleton)
 -- ============================================================================
 -- Crée UNIQUEMENT la table LegalSettings correspondant au modèle Prisma.
 -- Aucune suppression, aucune modification d'autres tables, aucune donnée.

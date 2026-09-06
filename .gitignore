@@ -68,3 +68,6 @@ server.log
 
 # Deploy scripts output
 *.tar.gz
+backups/
+
+private/

@@ -7,7 +7,7 @@ import {
   Menu, MessageSquare, Mail, Users, Star, Shield, ChevronLeft, ChevronRight,
   Plus, Pencil, Trash2, Search, Eye, EyeOff, Check, X, Clock,
   TrendingUp, BarChart3, LogOut, ArrowLeft, Lock, CreditCard, FileCheck,
-  Settings, Save, Scale, Globe,
+  Settings, Save, Scale, Globe, Wallet,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -65,7 +65,7 @@ interface OverviewStats {
   totalTestimonials: number; totalPages: number; totalMenus: number;
 }
 
-type Section = 'dashboard' | 'articles' | 'certifications' | 'formations' | 'categories' | 'pages' | 'menus' | 'comments' | 'newsletter' | 'contacts' | 'users' | 'testimonials' | 'payments' | 'legal';
+type Section = 'dashboard' | 'articles' | 'certifications' | 'formations' | 'categories' | 'pages' | 'menus' | 'comments' | 'newsletter' | 'contacts' | 'users' | 'testimonials' | 'payments' | 'legal' | 'paymentSettings';
 
 interface NavItem {
   id: Section;
@@ -359,6 +359,27 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
   const [legalLoading, setLegalLoading] = useState(false);
   const [legalSaving, setLegalSaving] = useState(false);
 
+  // Payment Settings
+  const [paymentForm, setPaymentForm] = useState({
+    attestationPrintPrice: 190,
+    currency: 'MAD',
+    paypalEnabled: true,
+    paypalEmail: '',
+    stripeEnabled: false,
+    stripePublicKey: '',
+    stripeSecretKey: '',
+    bankTransferEnabled: true,
+    bankName: '',
+    bankAccountName: '',
+    bankIban: '',
+    bankSwift: '',
+    bankNotes: '',
+    walletEnabled: false,
+    whatsappNumber: '',
+  });
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentSaving, setPaymentSaving] = useState(false);
+
   // General loading
   const [dashboardLoading, setDashboardLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -382,6 +403,7 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
     { id: 'testimonials', label: 'Témoignages', icon: Star },
     { id: 'payments', label: 'Paiements', icon: CreditCard },
     { id: 'legal', label: 'Informations Légales', icon: Scale },
+    { id: 'paymentSettings', label: 'Paramètres Paiement', icon: Wallet },
   ];
 
   // ============================================================
@@ -646,6 +668,7 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
       case 'users': fetchUsers(); break;
       case 'testimonials': fetchTestimonials(); break;
       case 'legal': fetchLegalSettings(); break;
+      case 'paymentSettings': fetchPaymentSettings(); break;
     }
   }, [section]);
 
@@ -2114,14 +2137,60 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
         body: JSON.stringify(legalForm),
       });
       toast.success('Informations légales enregistrées');
-      // Pas de fetchLegalSettings() ici — le formulaire contient déjà les
-      // données que l'utilisateur vient de saisir. Recharger depuis le
-      // serveur est inutile et peut causer un double toast (vert + rouge)
-      // si le GET échoue pour une raison quelconque.
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Erreur');
     } finally {
       setLegalSaving(false);
+    }
+  };
+
+  // ============================================================
+  // PAYMENT SETTINGS — Paramètres de paiement administrables
+  // ============================================================
+
+  const fetchPaymentSettings = useCallback(async () => {
+    setPaymentLoading(true);
+    try {
+      const data = await api('/api/admin/payment-settings');
+      const s = data.settings || {};
+      setPaymentForm({
+        attestationPrintPrice: s.attestationPrintPrice ?? 190,
+        currency: s.currency || 'MAD',
+        paypalEnabled: s.paypalEnabled ?? true,
+        paypalEmail: s.paypalEmail || '',
+        stripeEnabled: s.stripeEnabled ?? false,
+        stripePublicKey: s.stripePublicKey || '',
+        stripeSecretKey: s.stripeSecretKey || '',
+        bankTransferEnabled: s.bankTransferEnabled ?? true,
+        bankName: s.bankName || '',
+        bankAccountName: s.bankAccountName || '',
+        bankIban: s.bankIban || '',
+        bankSwift: s.bankSwift || '',
+        bankNotes: s.bankNotes || '',
+        walletEnabled: s.walletEnabled ?? false,
+        whatsappNumber: s.whatsappNumber || '',
+      });
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Erreur');
+    } finally {
+      setPaymentLoading(false);
+    }
+  }, [api]);
+
+  useEffect(() => { if (section === 'paymentSettings') fetchPaymentSettings(); }, [section, fetchPaymentSettings]);
+
+  const savePaymentSettings = async () => {
+    setPaymentSaving(true);
+    try {
+      await api('/api/admin/payment-settings', {
+        method: 'PUT',
+        body: JSON.stringify(paymentForm),
+      });
+      toast.success('Paramètres de paiement enregistrés');
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Erreur');
+    } finally {
+      setPaymentSaving(false);
     }
   };
 
@@ -2690,6 +2759,230 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
     );
   };
 
+  const renderPaymentSettings = () => {
+    if (paymentLoading) {
+      return (
+        <div>
+          <h2 className="text-xl font-semibold mb-4">Paramètres de Paiement</h2>
+          <div className="space-y-4">
+            <Skeleton className="h-12 rounded-lg" />
+            <Skeleton className="h-12 rounded-lg" />
+            <Skeleton className="h-12 rounded-lg" />
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div>
+        <div className="flex items-center gap-3 mb-6">
+          <Wallet className="h-6 w-6 text-emerald-600" />
+          <div>
+            <h2 className="text-xl font-semibold">Paramètres de Paiement</h2>
+            <p className="text-sm text-muted-foreground">
+              Activez ou désactivez les méthodes de paiement. Modifiez les coordonnées sans toucher au code.
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-6 max-w-4xl">
+          {/* Prix attestation imprimée */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Tarification</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="ps-attestationPrice">Prix attestation imprimée (MAD)</Label>
+                <Input
+                  id="ps-attestationPrice"
+                  type="number"
+                  value={paymentForm.attestationPrintPrice}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, attestationPrintPrice: parseFloat(e.target.value) || 0 })}
+                  placeholder="190"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Le prix de chaque cours est défini individuellement dans la section Formations.</p>
+              </div>
+              <div>
+                <Label htmlFor="ps-currency">Devise</Label>
+                <Input
+                  id="ps-currency"
+                  value={paymentForm.currency}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, currency: e.target.value })}
+                  placeholder="MAD"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* PayPal */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center justify-between">
+                PayPal
+                <Switch checked={paymentForm.paypalEnabled} onCheckedChange={(v) => setPaymentForm({ ...paymentForm, paypalEnabled: v })} />
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Label htmlFor="ps-paypalEmail">Email PayPal</Label>
+              <Input
+                id="ps-paypalEmail"
+                type="email"
+                value={paymentForm.paypalEmail}
+                onChange={(e) => setPaymentForm({ ...paymentForm, paypalEmail: e.target.value })}
+                placeholder="Ex : ouamrhar@gmail.com"
+                disabled={!paymentForm.paypalEnabled}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Stripe */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center justify-between">
+                Stripe (Carte bancaire)
+                <Switch checked={paymentForm.stripeEnabled} onCheckedChange={(v) => setPaymentForm({ ...paymentForm, stripeEnabled: v })} />
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="ps-stripePublicKey">Clé publique Stripe (Publishable Key)</Label>
+                <Input
+                  id="ps-stripePublicKey"
+                  value={paymentForm.stripePublicKey}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, stripePublicKey: e.target.value })}
+                  placeholder="pk_live_..."
+                  disabled={!paymentForm.stripeEnabled}
+                />
+              </div>
+              <div>
+                <Label htmlFor="ps-stripeSecretKey">Clé secrète Stripe (Secret Key)</Label>
+                <Input
+                  id="ps-stripeSecretKey"
+                  type="password"
+                  value={paymentForm.stripeSecretKey}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, stripeSecretKey: e.target.value })}
+                  placeholder="sk_live_..."
+                  disabled={!paymentForm.stripeEnabled}
+                />
+                <p className="text-xs text-muted-foreground mt-1">La clé secrète n&apos;est jamais exposée publiquement.</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Virement bancaire */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center justify-between">
+                Virement bancaire (RIB)
+                <Switch checked={paymentForm.bankTransferEnabled} onCheckedChange={(v) => setPaymentForm({ ...paymentForm, bankTransferEnabled: v })} />
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="ps-bankName">Nom de la banque</Label>
+                  <Input
+                    id="ps-bankName"
+                    value={paymentForm.bankName}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, bankName: e.target.value })}
+                    placeholder="Ex : Banque Populaire"
+                    disabled={!paymentForm.bankTransferEnabled}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="ps-bankAccountName">Titulaire du compte</Label>
+                  <Input
+                    id="ps-bankAccountName"
+                    value={paymentForm.bankAccountName}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, bankAccountName: e.target.value })}
+                    placeholder="Ex : Institut QHSE"
+                    disabled={!paymentForm.bankTransferEnabled}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="ps-bankIban">RIB / IBAN</Label>
+                  <Input
+                    id="ps-bankIban"
+                    value={paymentForm.bankIban}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, bankIban: e.target.value })}
+                    placeholder="Ex : 011 780 0000123456789012 34"
+                    disabled={!paymentForm.bankTransferEnabled}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="ps-bankSwift">Code SWIFT / BIC</Label>
+                  <Input
+                    id="ps-bankSwift"
+                    value={paymentForm.bankSwift}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, bankSwift: e.target.value })}
+                    placeholder="Ex : BPCOMAMC"
+                    disabled={!paymentForm.bankTransferEnabled}
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="ps-bankNotes">Instructions additionnelles</Label>
+                <Textarea
+                  id="ps-bankNotes"
+                  rows={3}
+                  value={paymentForm.bankNotes}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, bankNotes: e.target.value })}
+                  placeholder="Ex : Merci d'envoyer la preuve de virement sur WhatsApp..."
+                  disabled={!paymentForm.bankTransferEnabled}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Wallet */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center justify-between">
+                Wallet (Portefeuille client)
+                <Switch checked={paymentForm.walletEnabled} onCheckedChange={(v) => setPaymentForm({ ...paymentForm, walletEnabled: v })} />
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Active le système de wallet. Les clients pourront charger de l&apos;argent et payer leurs formations avec leur solde.
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* WhatsApp */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Contact WhatsApp (preuves de paiement)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Label htmlFor="ps-whatsapp">Numéro WhatsApp officiel</Label>
+              <Input
+                id="ps-whatsapp"
+                value={paymentForm.whatsappNumber}
+                onChange={(e) => setPaymentForm({ ...paymentForm, whatsappNumber: e.target.value })}
+                placeholder="Ex : +212 728 986 565"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Affiché aux clients pour l&apos;envoi des preuves de paiement.</p>
+            </CardContent>
+          </Card>
+
+          {/* Save */}
+          <div className="sticky bottom-4 flex justify-end bg-background/80 backdrop-blur-sm p-3 rounded-lg border">
+            <Button
+              onClick={savePaymentSettings}
+              disabled={paymentSaving}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              {paymentSaving ? 'Enregistrement...' : 'Enregistrer les paramètres'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderSection = () => {
     switch (section) {
       case 'dashboard': return renderDashboard();
@@ -2706,6 +2999,7 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
       case 'payments': return renderPayments();
       case 'testimonials': return renderTestimonials();
       case 'legal': return renderLegal();
+      case 'paymentSettings': return renderPaymentSettings();
       default: return null;
     }
   };

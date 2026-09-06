@@ -2114,7 +2114,10 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
         body: JSON.stringify(legalForm),
       });
       toast.success('Informations légales enregistrées');
-      fetchLegalSettings();
+      // Pas de fetchLegalSettings() ici — le formulaire contient déjà les
+      // données que l'utilisateur vient de saisir. Recharger depuis le
+      // serveur est inutile et peut causer un double toast (vert + rouge)
+      // si le GET échoue pour une raison quelconque.
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Erreur');
     } finally {

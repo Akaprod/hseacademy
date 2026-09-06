@@ -27,6 +27,7 @@ model User {
   emailTokens       EmailVerificationToken[]
   coursePayments    CoursePayment[]
   attestationPayments AttestationPayment[]
+  wallet            Wallet?
 }
 
 model Category {
@@ -465,6 +466,110 @@ model LegalSettings {
   refundPolicy    String?
   privacyPolicy   String?
   termsOfService  String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ============================================================================
+// WALLET — Système de portefeuille client
+// ============================================================================
+//
+// Wallet : 1 par utilisateur. Contient le solde courant.
+// WalletTransaction : historique de toutes les opérations (rechargement,
+//   achat cours, achat attestation, remboursement, bonus promotionnel).
+//
+// Types de transaction :
+//   - charge     : rechargement du wallet par le client
+//   - purchase   : achat d'un cours ou attestation avec le solde wallet
+//   - refund     : remboursement vers le wallet
+//   - bonus      : bonus promotionnel (ex: +5% sur rechargement)
+//
+// Les montants sont en MAD. Le solde est calculé à partir des transactions.
+// ============================================================================
+
+model Wallet {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balance         Float    @default(0)
+  currency        String   @default("MAD")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  transactions    WalletTransaction[]
+}
+
+model WalletTransaction {
+  id              String   @id @default(cuid())
+  walletId        String
+  wallet          Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  // Type d'opération
+  type            String   // charge | purchase | refund | bonus
+
+  // Montant en MAD (toujours positif ; le sens est déterminé par `type`)
+  amount          Float
+
+  // Pour les achats (purchase) : référence vers le paiement concerné
+  coursePaymentId     String?
+  attestationPaymentId String?
+
+  // Pour les rechargements (charge) : méthode de paiement utilisée
+  paymentMethod   String?  // paypal | stripe | bank_transfer
+
+  // Description lisible par l'utilisateur
+  description     String   @default("")
+
+  // Promotion (si bonus)
+  promotionId     String?
+
+  createdAt       DateTime @default(now())
+
+  @@index([walletId])
+  @@index([type])
+}
+
+// ============================================================================
+// PAYMENT SETTINGS — Paramètres de paiement administrables (singleton)
+// ============================================================================
+//
+// Configuré par l'admin depuis le dashboard. Remplace les constantes
+// hardcodées (PAYPAL_EMAIL, etc.) par des valeurs dynamiques.
+//
+// Permet d'activer/désactiver les méthodes de paiement et de modifier les
+// coordonnées sans toucher au code.
+// ============================================================================
+
+model PaymentSettings {
+  id              String   @id @default("default")
+
+  // Prix par défaut (modifiable par l'admin)
+  attestationPrintPrice Float  @default(190)
+  currency              String @default("MAD")
+
+  // PayPal
+  paypalEnabled   Boolean  @default(true)
+  paypalEmail     String?
+
+  // Stripe
+  stripeEnabled   Boolean  @default(false)
+  stripePublicKey String?
+  stripeSecretKey String?
+
+  // Virement bancaire
+  bankTransferEnabled Boolean @default(true)
+  bankName       String?
+  bankAccountName String?
+  bankIban       String?
+  bankSwift      String?
+  bankNotes      String?  // Instructions additionnelles
+
+  // Wallet
+  walletEnabled   Boolean  @default(false)
+
+  // WhatsApp pour preuves de paiement
+  whatsappNumber  String?
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

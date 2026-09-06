@@ -2075,8 +2075,7 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
   const fetchLegalSettings = useCallback(async () => {
     setLegalLoading(true);
     try {
-      const res = await api('/api/admin/legal-settings');
-      const data = await res.json();
+      const data = await api('/api/admin/legal-settings');
       const s = data.settings || {};
       setLegalForm({
         legalName: s.legalName || '',
@@ -2110,14 +2109,10 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
   const saveLegalSettings = async () => {
     setLegalSaving(true);
     try {
-      const res = await api('/api/admin/legal-settings', {
+      await api('/api/admin/legal-settings', {
         method: 'PUT',
         body: JSON.stringify(legalForm),
       });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Échec de l\'enregistrement');
-      }
       toast.success('Informations légales enregistrées');
       fetchLegalSettings();
     } catch (e: unknown) {

@@ -247,6 +247,23 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
     setWebsite(p.website || '');
   }, [data?.profile, user?.name]);
 
+  // ---- Fetch payments (placé AVANT le return conditionnel pour respecter
+  // les règles des Hooks React — un Hook ne doit jamais être appelé après un
+  // return conditionnel, sinon React error #310 est déclenché) ----
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      try {
+        const [cpRes, ppRes] = await Promise.all([
+          fetch('/api/courses/payments'),
+          fetch('/api/attestations/printed'),
+        ]);
+        if (cpRes.ok) setCoursePayments(await cpRes.json());
+        if (ppRes.ok) setPrintPayments(await ppRes.json());
+      } catch { /* ignore */ }
+    })();
+  }, [user]);
+
   // ---- Loading state ----
   if (loading || !user) {
     return (
@@ -262,21 +279,6 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
   const profile = data?.profile || null;
   const enrollments = data?.enrollments || [];
   const attestations = data?.attestations || [];
-
-  // Fetch payments
-  useEffect(() => {
-    if (!user) return;
-    (async () => {
-      try {
-        const [cpRes, ppRes] = await Promise.all([
-          fetch('/api/courses/payments'),
-          fetch('/api/attestations/printed'),
-        ]);
-        if (cpRes.ok) setCoursePayments(await cpRes.json());
-        if (ppRes.ok) setPrintPayments(await ppRes.json());
-      } catch { /* ignore */ }
-    })();
-  }, [user]);
 
   const emailVerified = !!profile?.emailVerified;
   const phoneVerified = !!profile?.phoneVerified;

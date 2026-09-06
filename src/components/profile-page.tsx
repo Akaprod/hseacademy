@@ -1139,7 +1139,8 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
                       <div key={p.id} className="flex items-center justify-between p-3 border border-slate-200 rounded-lg">
                         <div>
                           <p className="text-sm font-medium text-slate-900">{p.enrollment?.course?.title || 'Cours'}</p>
-                          <p className="text-xs text-slate-500">{p.method === 'bank_transfer' ? 'Virement' : 'PayPal'} — {p.amount} MAD</p>
+                          <p className="text-xs text-slate-500">{p.method === 'bank_transfer' ? 'Virement' : p.method === 'paypal' ? 'PayPal' : p.method === 'wallet' ? 'Wallet' : p.method} — {p.amount} MAD</p>
+                          <p className="text-xs text-slate-400">{new Date(p.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                         </div>
                         <PaymentStatusBadge status={p.status} />
                       </div>
@@ -1148,7 +1149,8 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
                       <div key={p.id} className="flex items-center justify-between p-3 border border-slate-200 rounded-lg">
                         <div>
                           <p className="text-sm font-medium text-slate-900">Attestation imprimée</p>
-                          <p className="text-xs text-slate-500">{p.method === 'bank_transfer' ? 'Virement' : 'PayPal'} — {p.amount} MAD</p>
+                          <p className="text-xs text-slate-500">{p.method === 'bank_transfer' ? 'Virement' : p.method === 'paypal' ? 'PayPal' : p.method === 'wallet' ? 'Wallet' : p.method} — {p.amount} MAD</p>
+                          <p className="text-xs text-slate-400">{new Date(p.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                         </div>
                         <PaymentStatusBadge status={p.status} />
                       </div>

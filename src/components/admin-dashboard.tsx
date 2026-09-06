@@ -337,6 +337,7 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
   const [payments, setPayments] = useState<any[]>([]);
   const [paymentsLoading, setPaymentsLoading] = useState(false);
   const [paymentsTotal, setPaymentsTotal] = useState(0);
+  const [payStatusFilter, setPayStatusFilter] = useState('');
   const [usersPage, setUsersPage] = useState(1);
   const [usersLoading, setUsersLoading] = useState(false);
 
@@ -2078,8 +2079,9 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
   const fetchPayments = useCallback(async () => {
     setPaymentsLoading(true);
     try {
-      const res = await api('/api/admin/payments?page=1&limit=50');
-      const data = await res.json();
+      const params = new URLSearchParams({ page: '1', limit: '50' });
+      if (payStatusFilter) params.set('status', payStatusFilter);
+      const data = await api(`/api/admin/payments?${params}`);
       setPayments(data.payments || []);
       setPaymentsTotal(data.total || 0);
     } catch (e: unknown) {
@@ -2087,7 +2089,7 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
     } finally {
       setPaymentsLoading(false);
     }
-  }, [api]);
+  }, [api, payStatusFilter]);
 
   useEffect(() => { if (section === 'payments') fetchPayments(); }, [section, fetchPayments]);
 
@@ -2221,6 +2223,40 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
       <SectionHeader title="Paiements" />
       {paymentsLoading ? <LoadingSkeleton /> : (
         <>
+          {/* Filtres statut */}
+          <div className="flex flex-wrap gap-2 mb-4">
+            <Button
+              variant={payStatusFilter === '' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setPayStatusFilter('')}
+              className={payStatusFilter === '' ? 'bg-emerald-600 text-white' : ''}
+            >Tous</Button>
+            <Button
+              variant={payStatusFilter === 'pending' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setPayStatusFilter('pending')}
+              className={payStatusFilter === 'pending' ? 'bg-amber-500 text-white' : ''}
+            >En attente</Button>
+            <Button
+              variant={payStatusFilter === 'submitted' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setPayStatusFilter('submitted')}
+              className={payStatusFilter === 'submitted' ? 'bg-blue-500 text-white' : ''}
+            >Preuve soumise</Button>
+            <Button
+              variant={payStatusFilter === 'validated' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setPayStatusFilter('validated')}
+              className={payStatusFilter === 'validated' ? 'bg-emerald-600 text-white' : ''}
+            >Validés</Button>
+            <Button
+              variant={payStatusFilter === 'rejected' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setPayStatusFilter('rejected')}
+              className={payStatusFilter === 'rejected' ? 'bg-red-500 text-white' : ''}
+            >Refusés</Button>
+          </div>
+
           <div className="text-sm text-slate-500 mb-2">{paymentsTotal} paiement(s)</div>
           <Card>
             <Table>
@@ -2243,7 +2279,7 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
                     <TableCell className="font-medium">{p.user?.name || '—'}</TableCell>
                     <TableCell className="hidden md:table-cell text-sm">{p.type === 'course' ? 'Cours' : 'Impression'}</TableCell>
                     <TableCell className="text-sm">{p.amount} MAD</TableCell>
-                    <TableCell className="text-sm">{p.method === 'bank_transfer' ? 'Virement' : 'PayPal'}</TableCell>
+                    <TableCell className="text-sm">{p.method === 'bank_transfer' ? 'Virement' : p.method === 'paypal' ? 'PayPal' : p.method === 'wallet' ? 'Wallet' : p.method}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className={
                         p.status === 'validated' ? 'bg-emerald-100 text-emerald-800' :

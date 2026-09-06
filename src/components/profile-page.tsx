@@ -20,7 +20,7 @@ import { toast } from 'sonner';
 import {
   Mail, Phone, Shield, ShieldCheck, ShieldAlert, Lock, User, Calendar,
   MapPin, Home, Facebook, Linkedin, Twitter, Globe, Award, Play,
-  FileCheck, ExternalLink, Loader2, CheckCircle, BookOpen,
+  FileCheck, ExternalLink, Loader2, CheckCircle, BookOpen, Wallet,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -34,6 +34,12 @@ import {
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  Select, SelectTrigger, SelectContent, SelectItem, SelectValue,
+} from '@/components/ui/select';
 import { PaymentStatusBadge, PrintPaymentModal } from '@/components/payment-components';
 
 // ============================================================================
@@ -187,6 +193,15 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
   const [printPayments, setPrintPayments] = useState<any[]>([]);
   const [printModalAttId, setPrintModalAttId] = useState<string | null>(null);
 
+  // --- Wallet ---
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [walletTransactions, setWalletTransactions] = useState<any[]>([]);
+  const [walletLoading, setWalletLoading] = useState(false);
+  const [chargeModalOpen, setChargeModalOpen] = useState(false);
+  const [chargeAmount, setChargeAmount] = useState('');
+  const [chargeMethod, setChargeMethod] = useState('paypal');
+  const [charging, setCharging] = useState(false);
+
   // Sync tab when initialTab changes (e.g., navigating from header dropdown)
   useEffect(() => {
     if (initialTab) setActiveTab(initialTab);
@@ -246,6 +261,55 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
     setTwitter(p.twitter || '');
     setWebsite(p.website || '');
   }, [data?.profile, user?.name]);
+
+  // ---- Fetch wallet ----
+  const fetchWallet = useCallback(async () => {
+    setWalletLoading(true);
+    try {
+      const res = await fetch('/api/wallet', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        setWalletBalance(data.balance || 0);
+        setWalletTransactions(data.transactions || []);
+      }
+    } catch { /* ignore */ }
+    finally { setWalletLoading(false); }
+  }, []);
+
+  useEffect(() => {
+    fetchWallet();
+  }, [fetchWallet]);
+
+  // ---- Charge wallet ----
+  const handleCharge = async () => {
+    const num = parseFloat(chargeAmount);
+    if (isNaN(num) || num < 10) {
+      toast.error('Montant minimum : 10 MAD');
+      return;
+    }
+    setCharging(true);
+    try {
+      const res = await fetch('/api/wallet/charge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: num, method: chargeMethod }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(`Wallet rechargé de ${num} MAD${data.bonus ? ` + ${data.bonus} MAD bonus` : ''}`);
+        setWalletBalance(data.newBalance);
+        setChargeAmount('');
+        setChargeModalOpen(false);
+        fetchWallet();
+      } else {
+        toast.error(data.error || 'Échec du rechargement');
+      }
+    } catch {
+      toast.error('Erreur réseau');
+    } finally {
+      setCharging(false);
+    }
+  };
 
   // ---- Fetch payments (placé AVANT le return conditionnel pour respecter
   // les règles des Hooks React — un Hook ne doit jamais être appelé après un
@@ -460,6 +524,9 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
               </TabsTrigger>
               <TabsTrigger value="attestations" className="gap-1.5">
                 <Award className="h-4 w-4" /> Mes attestations
+              </TabsTrigger>
+              <TabsTrigger value="wallet" className="gap-1.5">
+                <Wallet className="h-4 w-4" /> Mon Wallet
               </TabsTrigger>
             </TabsList>
           </div>
@@ -1105,6 +1172,79 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
               </CardContent>
             </Card>
           </TabsContent>
+        {/* ============================ G: Mon Wallet ============================ */}
+          <TabsContent value="wallet" className="mt-6">
+            <div className="space-y-4">
+              {/* Solde */}
+              <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-white">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-emerald-700">
+                    <Wallet className="h-5 w-5" /> Mon solde Wallet
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {walletLoading ? (
+                    <div className="flex items-center gap-2 text-slate-400">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Chargement...
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-3xl font-bold text-emerald-700">{walletBalance.toFixed(2)} MAD</p>
+                        <p className="text-xs text-slate-500 mt-1">Solde disponible</p>
+                      </div>
+                      <Button
+                        onClick={() => setChargeModalOpen(true)}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                      >
+                        <Wallet className="h-4 w-4 mr-2" />
+                        Recharger
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Historique des transactions */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <FileCheck className="h-4 w-4" /> Historique des transactions
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {walletTransactions.length === 0 ? (
+                    <p className="text-sm text-slate-500 text-center py-8">Aucune transaction pour le moment</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {walletTransactions.map((t: any) => (
+                        <div key={t.id} className="flex items-center justify-between p-3 border border-slate-200 rounded-lg">
+                          <div>
+                            <p className="text-sm font-medium text-slate-900">
+                              {t.type === 'charge' ? 'Rechargement' : t.type === 'purchase' ? 'Achat' : t.type === 'bonus' ? 'Bonus' : t.type === 'refund' ? 'Remboursement' : t.type}
+                            </p>
+                            <p className="text-xs text-slate-500">{t.description || t.paymentMethod || ''}</p>
+                            <p className="text-xs text-slate-400">{new Date(t.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                          </div>
+                          <span className={`text-sm font-semibold ${t.type === 'charge' || t.type === 'bonus' || t.type === 'refund' ? 'text-emerald-600' : 'text-red-500'}`}>
+                            {t.type === 'purchase' ? '-' : '+'}{t.amount.toFixed(2)} MAD
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Promotions info */}
+              <Card className="bg-amber-50 border-amber-200">
+                <CardContent className="pt-4">
+                  <p className="text-sm text-amber-800 font-medium mb-1">Bonus sur rechargement</p>
+                  <p className="text-xs text-amber-700">Rechargez 500 MAD → +5% bonus | Rechargez 1000 MAD → +10% bonus</p>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
         </Tabs>
       </div>
       {printModalAttId && (
@@ -1114,6 +1254,65 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
           attestationId={printModalAttId}
           onSuccess={() => { setPrintModalAttId(null); }}
         />
+      )}
+
+      {/* Modal rechargement Wallet */}
+      {chargeModalOpen && (
+        <Dialog open={chargeModalOpen} onOpenChange={setChargeModalOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Wallet className="h-5 w-5 text-emerald-600" /> Recharger mon Wallet
+              </DialogTitle>
+              <DialogDescription>
+                Choisissez un montant et une méthode de paiement.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label htmlFor="charge-amount">Montant (MAD)</Label>
+                <Input
+                  id="charge-amount"
+                  type="number"
+                  min="10"
+                  value={chargeAmount}
+                  onChange={(e) => setChargeAmount(e.target.value)}
+                  placeholder="Ex : 500"
+                />
+                <p className="text-xs text-slate-500 mt-1">Minimum 10 MAD. Bonus à partir de 500 MAD.</p>
+              </div>
+              <div>
+                <Label htmlFor="charge-method">Méthode de paiement</Label>
+                <Select value={chargeMethod} onValueChange={setChargeMethod}>
+                  <SelectTrigger id="charge-method">
+                    <SelectValue placeholder="Choisir..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="paypal">PayPal</SelectItem>
+                    <SelectItem value="bank_transfer">Virement bancaire</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {chargeAmount && parseFloat(chargeAmount) >= 1000 && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                  <p className="text-sm text-emerald-700 font-medium">Bonus : +{((parseFloat(chargeAmount) || 0) * 0.10).toFixed(2)} MAD (10%)</p>
+                </div>
+              )}
+              {chargeAmount && parseFloat(chargeAmount) >= 500 && parseFloat(chargeAmount) < 1000 && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                  <p className="text-sm text-emerald-700 font-medium">Bonus : +{((parseFloat(chargeAmount) || 0) * 0.05).toFixed(2)} MAD (5%)</p>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setChargeModalOpen(false)}>Annuler</Button>
+              <Button onClick={handleCharge} disabled={charging} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                {charging ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                {charging ? 'Traitement...' : 'Recharger'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

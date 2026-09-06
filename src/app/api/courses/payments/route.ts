@@ -75,6 +75,71 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Paiement déjà validé', payment: existingPayment }, { status: 400 });
     }
 
+    // ---- PAIEMENT VIA WALLET (instantané, pas de preuve requise) ----
+    if (method === 'wallet') {
+      let wallet = await db.wallet.findUnique({ where: { userId: auth.id } });
+      if (!wallet) {
+        return NextResponse.json({ error: 'Wallet non trouvé. Veuillez recharger votre wallet d\'abord.' }, { status: 400 });
+      }
+      if (wallet.balance < amount) {
+        return NextResponse.json({ error: `Solde insuffisant. Votre solde est de ${wallet.balance} MAD, le cours coûte ${amount} MAD.` }, { status: 400 });
+      }
+
+      // Débiter le wallet
+      const newBalance = wallet.balance - amount;
+      await db.wallet.update({ where: { id: wallet.id }, data: { balance: newBalance } });
+
+      // Créer la transaction wallet
+      const walletTx = await db.walletTransaction.create({
+        data: {
+          walletId: wallet.id,
+          type: 'purchase',
+          amount,
+          description: `Achat cours : ${enrollment.courseId}`,
+        },
+      });
+
+      // Créer ou mettre à jour le paiement — VALIDÉ immédiatement
+      if (existingPayment) {
+        const updated = await db.coursePayment.update({
+          where: { enrollmentId },
+          data: {
+            method,
+            status: 'validated',
+            validatedAt: new Date(),
+            validatedBy: 'wallet-system',
+            rejectionReason: null,
+          },
+        });
+        await db.enrollment.update({
+          where: { id: enrollmentId },
+          data: { paymentStatus: 'validated' },
+        });
+        return NextResponse.json({ payment: updated, walletBalance: newBalance });
+      }
+
+      const payment = await db.coursePayment.create({
+        data: {
+          userId: auth.id,
+          enrollmentId,
+          courseId: enrollment.courseId,
+          amount,
+          currency: CURRENCY,
+          method,
+          status: 'validated',
+          validatedAt: new Date(),
+          validatedBy: 'wallet-system',
+        },
+      });
+      await db.enrollment.update({
+        where: { id: enrollmentId },
+        data: { paymentStatus: 'validated' },
+      });
+      return NextResponse.json({ payment, walletBalance: newBalance }, { status: 201 });
+    }
+
+    // ---- PAIEMENT VIA PAYPAL OU VIREMENT (preuve requise, validation manuelle) ----
+
     // Traiter le fichier de preuve si fourni
     let proofPath: string | null = null;
     let proofOriginalName: string | null = null;

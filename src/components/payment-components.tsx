@@ -126,6 +126,7 @@ export function PaymentModal({ open, onOpenChange, enrollmentId, courseTitle, am
               <SelectContent>
                 <SelectItem value="bank_transfer">Virement bancaire</SelectItem>
                 <SelectItem value="paypal">PayPal</SelectItem>
+                <SelectItem value="wallet">Wallet (solde instantané)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -147,21 +148,31 @@ export function PaymentModal({ open, onOpenChange, enrollmentId, courseTitle, am
             </div>
           )}
 
-          {/* Upload preuve */}
-          <div>
-            <Label>Preuve de paiement (optionnel)</Label>
-            <Input
-              type="file"
-              accept="image/*,application/pdf"
-              onChange={(e) => setProofFile(e.target.files?.[0] || null)}
-              className="mt-1"
-            />
-            {proofFile && (
-              <p className="text-xs text-slate-500 mt-1">
-                Fichier sélectionné : {proofFile.name} ({(proofFile.size / 1024).toFixed(0)} KB)
-              </p>
-            )}
-          </div>
+          {method === 'wallet' && (
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm space-y-1">
+              <p className="font-semibold text-emerald-700">Wallet — {amount} MAD</p>
+              <p className="text-emerald-600">Le montant sera débité de votre solde wallet et le cours sera débloqué immédiatement.</p>
+              <p className="text-xs text-emerald-500 mt-2">Pas de preuve requise. Validation instantanée.</p>
+            </div>
+          )}
+
+          {/* Upload preuve — masqué pour wallet */}
+          {method !== 'wallet' && (
+            <div>
+              <Label>Preuve de paiement (optionnel)</Label>
+              <Input
+                type="file"
+                accept="image/*,application/pdf"
+                onChange={(e) => setProofFile(e.target.files?.[0] || null)}
+                className="mt-1"
+              />
+              {proofFile && (
+                <p className="text-xs text-slate-500 mt-1">
+                  Fichier sélectionné : {proofFile.name} ({(proofFile.size / 1024).toFixed(0)} KB)
+                </p>
+              )}
+            </div>
+          )}
 
           {/* WhatsApp contact */}
           <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-700">
@@ -247,6 +258,7 @@ export function PrintPaymentModal({ open, onOpenChange, attestationId, onSuccess
               <SelectContent>
                 <SelectItem value="bank_transfer">Virement bancaire</SelectItem>
                 <SelectItem value="paypal">PayPal</SelectItem>
+                <SelectItem value="wallet">Wallet (solde instantané)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -265,10 +277,19 @@ export function PrintPaymentModal({ open, onOpenChange, attestationId, onSuccess
             </div>
           )}
 
-          <div>
-            <Label>Preuve de paiement</Label>
-            <Input type="file" accept="image/*,application/pdf" onChange={(e) => setProofFile(e.target.files?.[0] || null)} className="mt-1" />
-          </div>
+          {method === 'wallet' && (
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm">
+              <p className="font-semibold text-emerald-700">Wallet — {ATTESTATION_PRINT_PRICE_MAD} MAD</p>
+              <p className="text-emerald-600">Débit instantané de votre solde.</p>
+            </div>
+          )}
+
+          {method !== 'wallet' && (
+            <div>
+              <Label>Preuve de paiement</Label>
+              <Input type="file" accept="image/*,application/pdf" onChange={(e) => setProofFile(e.target.files?.[0] || null)} className="mt-1" />
+            </div>
+          )}
 
           <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-700">
             <p>WhatsApp : {WHATSAPP_NUMBER}</p>

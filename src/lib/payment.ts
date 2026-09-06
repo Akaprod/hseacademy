@@ -17,7 +17,7 @@ export const COURSE_PRICE_MAD = 120;
 export const ATTESTATION_PRINT_PRICE_MAD = 190;
 export const CURRENCY = 'MAD';
 
-export const PAYMENT_METHODS = ['bank_transfer', 'paypal'] as const;
+export const PAYMENT_METHODS = ['bank_transfer', 'paypal', 'wallet'] as const;
 export type PaymentMethod = typeof PAYMENT_METHODS[number];
 
 export const PAYMENT_STATUSES = [

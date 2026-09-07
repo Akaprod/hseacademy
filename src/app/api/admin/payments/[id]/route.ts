@@ -68,15 +68,39 @@ export async function PATCH(
     const body = await request.json();
     const { action, type, rejectionReason } = body;
 
-    if (!action || !['validate', 'reject'].includes(action)) {
-      return NextResponse.json({ error: 'Action invalide (validate ou reject)' }, { status: 400 });
+    if (!action || !['validate', 'reject', 'archive'].includes(action)) {
+      return NextResponse.json({ error: 'Action invalide (validate, reject ou archive)' }, { status: 400 });
     }
-    if (!type || !['course', 'attestation', 'wallet'].includes(type)) {
-      return NextResponse.json({ error: 'Type invalide (course, attestation ou wallet)' }, { status: 400 });
+    if (!type || !['course', 'attestation', 'wallet', 'payment_request'].includes(type)) {
+      return NextResponse.json({ error: 'Type invalide' }, { status: 400 });
     }
 
     if (action === 'reject' && !rejectionReason) {
       return NextResponse.json({ error: 'Motif de refus requis' }, { status: 400 });
+    }
+
+    // ---- Archive : applicable à tous les types ----
+    if (action === 'archive') {
+      if (type === 'course') {
+        const payment = await db.coursePayment.findUnique({ where: { id } });
+        if (!payment) return NextResponse.json({ error: 'Paiement non trouvé' }, { status: 404 });
+        await db.coursePayment.update({ where: { id }, data: { status: 'archived' } });
+      } else if (type === 'attestation') {
+        const payment = await db.attestationPayment.findUnique({ where: { id } });
+        if (!payment) return NextResponse.json({ error: 'Paiement non trouvé' }, { status: 404 });
+        await db.attestationPayment.update({ where: { id }, data: { status: 'archived' } });
+      } else if (type === 'wallet') {
+        await db.walletTransaction.update({
+          where: { id },
+          data: { description: `Rechargement — ARCHIVÉ` },
+        });
+      } else if (type === 'payment_request') {
+        await db.paymentRequest.update({
+          where: { id },
+          data: { reqStatus: 'archived' },
+        });
+      }
+      return NextResponse.json({ success: true, message: 'Archivé' });
     }
 
     if (type === 'course') {

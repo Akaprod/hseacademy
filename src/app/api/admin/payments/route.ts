@@ -38,6 +38,8 @@ export async function GET(request: NextRequest) {
       walletWhere.description = { contains: 'VALIDÉ' };
     } else if (status === 'rejected') {
       walletWhere.description = { contains: 'REFUSÉ' };
+    } else if (status === 'archived') {
+      walletWhere.description = { contains: 'ARCHIVÉ' };
     }
 
     let coursePayments: any[] = [];
@@ -109,7 +111,8 @@ export async function GET(request: NextRequest) {
         currency: 'MAD',
         method: t.paymentMethod || 'wallet',
         status: t.description.includes('EN ATTENTE') ? 'pending' :
-                t.description.includes('REFUSÉ') ? 'rejected' : 'validated',
+                t.description.includes('REFUSÉ') ? 'rejected' :
+                t.description.includes('ARCHIVÉ') ? 'archived' : 'validated',
         type: 'wallet',
         description: t.description,
         createdAt: t.createdAt,

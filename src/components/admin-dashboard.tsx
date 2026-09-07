@@ -2223,6 +2223,16 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
     }
   };
 
+  const archivePayment = async (id: string, type: string) => {
+    try {
+      await api(`/api/admin/payments/${id}`, { method: 'PATCH', body: JSON.stringify({ action: 'archive', type }) });
+      toast.success('Paiement archivé');
+      fetchPayments();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Erreur');
+    }
+  };
+
   const renderPayments = () => (
     <div>
       <SectionHeader title="Paiements" />
@@ -2243,12 +2253,6 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
               className={payStatusFilter === 'pending' ? 'bg-amber-500 text-white' : ''}
             >En attente</Button>
             <Button
-              variant={payStatusFilter === 'submitted' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setPayStatusFilter('submitted')}
-              className={payStatusFilter === 'submitted' ? 'bg-blue-500 text-white' : ''}
-            >Preuve soumise</Button>
-            <Button
               variant={payStatusFilter === 'validated' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setPayStatusFilter('validated')}
@@ -2260,6 +2264,12 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
               onClick={() => setPayStatusFilter('rejected')}
               className={payStatusFilter === 'rejected' ? 'bg-red-500 text-white' : ''}
             >Refusés</Button>
+            <Button
+              variant={payStatusFilter === 'archived' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setPayStatusFilter('archived')}
+              className={payStatusFilter === 'archived' ? 'bg-slate-600 text-white' : ''}
+            >Archivés</Button>
           </div>
 
           <div className="text-sm text-slate-500 mb-2">{paymentsTotal} paiement(s)</div>
@@ -2290,8 +2300,9 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
                         p.status === 'validated' ? 'bg-emerald-100 text-emerald-800' :
                         p.status === 'rejected' ? 'bg-red-100 text-red-800' :
                         p.status === 'submitted' ? 'bg-blue-100 text-blue-800' :
+                        p.status === 'archived' ? 'bg-slate-200 text-slate-600' :
                         'bg-amber-100 text-amber-800'
-                      }>{p.status === 'validated' ? 'Validé' : p.status === 'rejected' ? 'Refusé' : p.status === 'submitted' ? 'Preuve soumise' : 'En attente'}</Badge>
+                      }>{p.status === 'validated' ? 'Validé' : p.status === 'rejected' ? 'Refusé' : p.status === 'submitted' ? 'Preuve soumise' : p.status === 'archived' ? 'Archivé' : 'En attente'}</Badge>
                     </TableCell>
                     <TableCell className="hidden sm:table-cell text-sm text-slate-500">{formatDate(p.createdAt)}</TableCell>
                     <TableCell className="text-right">
@@ -2337,6 +2348,12 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
                         {(p.status === 'pending' || p.status === 'submitted') && (
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => rejectPayment(p.id, p.type)} title="Refuser">
                             <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {/* Archiver — affiché pour validated et rejected */}
+                        {(p.status === 'validated' || p.status === 'rejected') && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500" onClick={() => archivePayment(p.id, p.type)} title="Archiver">
+                            <FolderOpen className="h-4 w-4" />
                           </Button>
                         )}
                       </div>

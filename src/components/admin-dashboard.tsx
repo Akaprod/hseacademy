@@ -2198,7 +2198,12 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
 
   const validatePayment = async (id: string, type: string) => {
     try {
-      await api(`/api/admin/payments/${id}`, { method: 'PATCH', body: JSON.stringify({ action: 'validate', type }) });
+      if (type === 'wallet') {
+        // Validation wallet : créditer le solde + bonus
+        await api(`/api/admin/payments/${id}`, { method: 'PATCH', body: JSON.stringify({ action: 'validate', type: 'wallet' }) });
+      } else {
+        await api(`/api/admin/payments/${id}`, { method: 'PATCH', body: JSON.stringify({ action: 'validate', type }) });
+      }
       toast.success('Paiement validé');
       fetchPayments();
     } catch (e: unknown) {
@@ -2277,7 +2282,7 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
                 ) : payments.map((p: any) => (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">{p.user?.name || '—'}</TableCell>
-                    <TableCell className="hidden md:table-cell text-sm">{p.type === 'course' ? 'Cours' : 'Impression'}</TableCell>
+                    <TableCell className="hidden md:table-cell text-sm">{p.type === 'course' ? 'Cours' : p.type === 'attestation' ? 'Impression' : p.type === 'wallet' ? 'Rechargement Wallet' : p.type}</TableCell>
                     <TableCell className="text-sm">{p.amount} MAD</TableCell>
                     <TableCell className="text-sm">{p.method === 'bank_transfer' ? 'Virement' : p.method === 'paypal' ? 'PayPal' : p.method === 'wallet' ? 'Wallet' : p.method}</TableCell>
                     <TableCell>

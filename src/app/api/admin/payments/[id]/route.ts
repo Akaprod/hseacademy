@@ -71,8 +71,8 @@ export async function PATCH(
     if (!action || !['validate', 'reject'].includes(action)) {
       return NextResponse.json({ error: 'Action invalide (validate ou reject)' }, { status: 400 });
     }
-    if (!type || !['course', 'attestation'].includes(type)) {
-      return NextResponse.json({ error: 'Type invalide (course ou attestation)' }, { status: 400 });
+    if (!type || !['course', 'attestation', 'wallet'].includes(type)) {
+      return NextResponse.json({ error: 'Type invalide (course, attestation ou wallet)' }, { status: 400 });
     }
 
     if (action === 'reject' && !rejectionReason) {
@@ -121,8 +121,7 @@ export async function PATCH(
 
         return NextResponse.json({ payment: updated });
       }
-    } else {
-      // type === 'attestation'
+    } else if (type === 'attestation') {
       const payment = await db.attestationPayment.findUnique({ where: { id } });
       if (!payment) {
         return NextResponse.json({ error: 'Paiement non trouvé' }, { status: 404 });
@@ -149,6 +148,51 @@ export async function PATCH(
           },
         });
         return NextResponse.json({ payment: updated });
+      }
+    } else if (type === 'wallet') {
+      // ---- Validation wallet : créditer le solde + bonus ----
+      const tx = await db.walletTransaction.findUnique({
+        where: { id },
+        include: { wallet: true },
+      });
+      if (!tx || tx.type !== 'charge') {
+        return NextResponse.json({ error: 'Transaction wallet non trouvée' }, { status: 404 });
+      }
+
+      if (action === 'validate') {
+        let bonus = 0;
+        if (tx.amount >= 1000) bonus = tx.amount * 0.10;
+        else if (tx.amount >= 500) bonus = tx.amount * 0.05;
+
+        const newBalance = tx.wallet.balance + tx.amount + bonus;
+        await db.wallet.update({
+          where: { id: tx.walletId },
+          data: { balance: newBalance },
+        });
+
+        await db.walletTransaction.update({
+          where: { id },
+          data: { description: `Rechargement de ${tx.amount} MAD via ${tx.paymentMethod} — VALIDÉ` },
+        });
+
+        if (bonus > 0) {
+          await db.walletTransaction.create({
+            data: {
+              walletId: tx.walletId,
+              type: 'bonus',
+              amount: bonus,
+              description: `Bonus de ${bonus} MAD (rechargement ≥ ${tx.amount >= 1000 ? '1000' : '500'} MAD)`,
+            },
+          });
+        }
+
+        return NextResponse.json({ success: true, newBalance, bonus });
+      } else {
+        await db.walletTransaction.update({
+          where: { id },
+          data: { description: `Rechargement de ${tx.amount} MAD via ${tx.paymentMethod} — REFUSÉ (${rejectionReason})` },
+        });
+        return NextResponse.json({ success: true });
       }
     }
   } catch (error) {

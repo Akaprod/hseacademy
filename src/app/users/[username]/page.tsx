@@ -1,15 +1,18 @@
 // ============================================================================
-// Page publique CV — /@/[username]
+// Page publique CV — /users/[username]
 // ============================================================================
 // Accessible sans authentification. Affiche le CV professionnel de l'utilisateur.
 // Si le profil est privé ou n'existe pas → page 404 personnalisée.
+// ============================================================================
+//
+// L'URL publique est hseacademy.online/users/akaprod
+// (le /@ username n'est pas compatible avec Next.js App Router car @ = parallel route)
 // ============================================================================
 
 import { notFound } from 'next/navigation';
 import { db } from '@/lib/db';
 import PublicCV from '@/components/public-cv';
 
-// Force dynamic rendering (pas de cache)
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: { params: Promise<{ username: string }> }) {
@@ -32,7 +35,7 @@ export async function generateMetadata({ params }: { params: Promise<{ username:
     openGraph: {
       title: `${title} — HSE Academy`,
       description: profile.cvBio || `CV professionnel de ${name} sur HSE Academy`,
-      url: `https://hseacademy.online/@${username}`,
+      url: `https://hseacademy.online/users/${username}`,
       siteName: 'HSE Academy',
       type: 'profile',
     },
@@ -51,7 +54,6 @@ export default async function CVPage({ params }: { params: Promise<{ username: s
     notFound();
   }
 
-  // Récupérer les formations + attestations
   const [enrollments, attestations] = await Promise.all([
     db.enrollment.findMany({
       where: { userId: profile.userId, status: 'active' },

@@ -1124,7 +1124,7 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
                   <div>
                     <Label htmlFor="username">Lien public de votre CV</Label>
                     <div className="flex items-center mt-1">
-                      <span className="text-sm text-slate-400 bg-slate-100 border border-r-0 border-slate-200 rounded-l-md px-3 py-2">hseacademy.online/@</span>
+                      <span className="text-sm text-slate-400 bg-slate-100 border border-r-0 border-slate-200 rounded-l-md px-3 py-2">hseacademy.online/users/</span>
                       <Input id="username" value={usernameValue} onChange={(e) => setUsernameValue(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))} placeholder="akaprod" maxLength={12} className="rounded-l-none" />
                     </div>
                     <p className="text-xs text-slate-400 mt-1">5 à 12 caractères, lettres, chiffres et _ uniquement.</p>
@@ -1134,10 +1134,10 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
                   {profile?.username && (
                     <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-emerald-700">Votre CV : <a href={`https://hseacademy.online/@${profile.username}`} target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:underline">hseacademy.online/@{profile.username}</a></p>
+                        <p className="text-sm font-medium text-emerald-700">Votre CV : <a href={`https://hseacademy.online/users/${profile.username}`} target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:underline">hseacademy.online/users/{profile.username}</a></p>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(`https://hseacademy.online/@${profile.username}`); toast.success('Lien copié'); }}>
+                        <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(`https://hseacademy.online/users/${profile.username}`); toast.success('Lien copié'); }}>
                           Copier
                         </Button>
                         <div className="flex items-center gap-1">

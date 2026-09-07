@@ -311,19 +311,42 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
       const res = await fetch('/api/payment-requests', { method: 'POST', body: formData });
       const data = await res.json();
       if (res.ok) {
-        setChargeModalOpen(false);
-        setChargeAmount('');
         toast.success('Demande créée — suivez les instructions');
         fetchRequests();
-        // Afficher instructions
+        // Récupérer les instructions de paiement depuis les settings
         const ps = await fetch('/api/payment-settings').then(r => r.json());
         const s = ps.settings || {};
         const instructions: Record<string, any> = {
-          paypal: { title: 'PayPal', amount: num, email: s.paypalEmail || 'ouamrhar@gmail.com' },
-          bank_transfer: { title: 'Virement', amount: num, bankName: s.bankName, iban: s.bankIban, accountName: s.bankAccountName },
+          paypal: {
+            title: 'Paiement PayPal',
+            amount: num,
+            email: s.paypalEmail || 'ouamrhar@gmail.com',
+            steps: [
+              `Connectez-vous à PayPal et envoyez ${num} MAD à : ${s.paypalEmail || 'ouamrhar@gmail.com'}`,
+              'Ajoutez en note : "Rechargement Wallet HSE Academy"',
+              'Après le paiement, allez dans "Mes Demandes" et soumettez votre preuve',
+            ],
+          },
+          bank_transfer: {
+            title: 'Virement bancaire',
+            amount: num,
+            bankName: s.bankName || 'À contacter',
+            accountName: s.bankAccountName || 'À contacter',
+            iban: s.bankIban || 'À contacter',
+            swift: s.bankSwift || '',
+            steps: [
+              `Effectuez un virement de ${num} MAD vers :`,
+              `Banque : ${s.bankName || 'À contacter'}`,
+              `Titulaire : ${s.bankAccountName || 'À contacter'}`,
+              `RIB : ${s.bankIban || 'À contacter'}`,
+              'Après le virement, allez dans "Mes Demandes" et soumettez votre preuve',
+            ],
+          },
         };
         setChargeInstructions(instructions[chargeMethod] || null);
         setChargeWhatsapp(s.whatsappNumber || '+212728986565');
+        setChargeAmount('');
+        // NE PAS fermer le modal — laisser les instructions visibles
       } else {
         toast.error(data.error || 'Échec');
       }
@@ -361,14 +384,14 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
     setSubmittingProof(true);
     try {
       const formData = new FormData();
-      formData.append('id', proofRequestId);
-      formData.append('amount', '0');
-      formData.append('method', 'paypal');
-      formData.append('reqType', 'wallet_charge');
+      formData.append('requestId', proofRequestId);
       if (proofFile) formData.append('proof', proofFile);
       if (proofText.trim()) formData.append('proofText', proofText.trim());
 
-      const res = await fetch('/api/payment-requests', { method: 'POST', body: formData });
+      const res = await fetch('/api/payment-requests', {
+        method: 'PATCH',
+        body: formData,
+      });
       const data = await res.json();
       if (res.ok) {
         toast.success('Preuve soumise — en attente de validation');

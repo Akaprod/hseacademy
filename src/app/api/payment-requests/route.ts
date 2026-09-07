@@ -193,3 +193,91 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
   }
 }
+
+// --- PATCH : Soumettre une preuve sur une demande existante ---
+export async function PATCH(req: NextRequest) {
+  const auth = await requireUser();
+  if (auth instanceof NextResponse) return auth;
+
+  try {
+    const contentType = req.headers.get('content-type') || '';
+    let requestId: string;
+    let proofFile: File | null = null;
+    let proofText: string | null = null;
+
+    if (contentType.includes('multipart/form-data')) {
+      const formData = await req.formData();
+      requestId = String(formData.get('requestId') || '');
+      const file = formData.get('proof');
+      if (file && file instanceof File) proofFile = file;
+      proofText = String(formData.get('proofText') || '');
+    } else {
+      const body = await req.json();
+      requestId = body.requestId;
+      proofText = body.proofText || null;
+    }
+
+    if (!requestId) {
+      return NextResponse.json({ error: 'ID de demande requis' }, { status: 400 });
+    }
+
+    if (!proofFile && !proofText?.trim()) {
+      return NextResponse.json({ error: 'Preuve requise (image ou texte)' }, { status: 400 });
+    }
+
+    // Vérifier que la demande appartient à l'utilisateur et est en statut pending
+    const request = await db.paymentRequest.findUnique({ where: { id: requestId } });
+    if (!request || request.userId !== auth.id) {
+      return NextResponse.json({ error: 'Demande non trouvée' }, { status: 404 });
+    }
+
+    if (request.reqStatus !== 'pending') {
+      return NextResponse.json({ error: 'Cette demande n\'est plus en attente de preuve' }, { status: 400 });
+    }
+
+    // Traiter le fichier de preuve
+    let proofPath: string | null = null;
+    let proofOriginalName: string | null = null;
+    let proofMimeType: string | null = null;
+    let proofSize: number | null = null;
+
+    if (proofFile) {
+      if (proofFile.size > MAX_PROOF_SIZE) {
+        return NextResponse.json({ error: 'Fichier trop volumineux (max 10 MB)' }, { status: 400 });
+      }
+      if (!ALLOWED_MIME_TYPES.includes(proofFile.type)) {
+        return NextResponse.json({ error: 'Type de fichier non autorisé' }, { status: 400 });
+      }
+      const ext = path.extname(proofFile.name) || (proofFile.type === 'application/pdf' ? '.pdf' : '.jpg');
+      const safeName = `${randomBytes(16).toString('hex')}${ext}`;
+      proofPath = `${PROOF_UPLOAD_DIR}/${safeName}`;
+      proofOriginalName = proofFile.name;
+      proofMimeType = proofFile.type;
+      proofSize = proofFile.size;
+      await fs.mkdir(PROOF_UPLOAD_DIR, { recursive: true });
+      const buffer = Buffer.from(await proofFile.arrayBuffer());
+      await fs.writeFile(proofPath, buffer);
+    }
+
+    // Mettre à jour la demande avec la preuve
+    const description = proofText?.trim() ? `Preuve: ${proofText.trim()}` : '';
+
+    await db.paymentRequest.update({
+      where: { id: requestId },
+      data: {
+        reqStatus: 'submitted',
+        submittedAt: new Date(),
+        proofPath,
+        proofOriginalName,
+        proofMimeType,
+        proofSize,
+        description: description || request.description,
+      },
+    });
+
+    return NextResponse.json({ success: true, message: 'Preuve soumise — en attente de validation' });
+  } catch (error) {
+    console.error('PATCH /api/payment-requests error:', error);
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
+  }
+}

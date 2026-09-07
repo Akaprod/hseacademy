@@ -2353,18 +2353,21 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
                             </Button>
                           </a>
                         )}
-                        {/* Valider — affiché pour pending ET submitted */}
-                        {(p.status === 'pending' || p.status === 'submitted') && (
+                        {/* Valider — affiché pour submitted (preuve soumise) ET pending (sans preuve) */}
+                        {/* Pour payment_request : seulement submitted (avec preuve) */}
+                        {((p.status === 'pending' || p.status === 'submitted') && p.type !== 'payment_request') ||
+                         (p.status === 'submitted' && p.type === 'payment_request') ? (
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-500" onClick={() => validatePayment(p.id, p.type)} title="Valider">
                             <Check className="h-4 w-4" />
                           </Button>
-                        )}
-                        {/* Refuser — affiché pour pending ET submitted */}
-                        {(p.status === 'pending' || p.status === 'submitted') && (
+                        ) : null}
+                        {/* Refuser — mêmes conditions que valider */}
+                        {((p.status === 'pending' || p.status === 'submitted') && p.type !== 'payment_request') ||
+                         (p.status === 'submitted' && p.type === 'payment_request') ? (
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => rejectPayment(p.id, p.type)} title="Refuser">
                             <X className="h-4 w-4" />
                           </Button>
-                        )}
+                        ) : null}
                         {/* Archiver — affiché pour validated et rejected */}
                         {(p.status === 'validated' || p.status === 'rejected') && (
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500" onClick={() => archivePayment(p.id, p.type)} title="Archiver">

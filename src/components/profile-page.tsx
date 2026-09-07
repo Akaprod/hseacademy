@@ -1170,10 +1170,7 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
                   {profile?.username && (
                     <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-emerald-700">Votre CV :</p>
-                        <a href={`https://hseacademy.online/@${profile.username}`} target="_blank" rel="noopener noreferrer" className="text-sm text-emerald-600 hover:underline">
-                          hseacademy.online/@{profile.username}
-                        </a>
+                        <p className="text-sm font-medium text-emerald-700">Votre CV : <a href={`https://hseacademy.online/@${profile.username}`} target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:underline">hseacademy.online/@{profile.username}</a></p>
                       </div>
                       <div className="flex items-center gap-2">
                         <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(`https://hseacademy.online/@${profile.username}`); toast.success('Lien copié'); }}>

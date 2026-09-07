@@ -2322,13 +2322,14 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
                             const details = [
                               `Utilisateur: ${p.user?.name || '—'}`,
                               `Email: ${p.user?.email || '—'}`,
-                              `Type: ${p.type === 'course' ? 'Cours' : p.type === 'attestation' ? 'Impression' : 'Rechargement Wallet'}`,
+                              `Type: ${p.type === 'course' ? 'Cours' : p.type === 'attestation' ? 'Impression' : p.type === 'wallet' ? 'Rechargement Wallet' : p.type === 'payment_request' ? 'Demande Client' : p.type}`,
                               `Montant: ${p.amount} MAD`,
-                              `Méthode: ${p.method}`,
-                              `Statut: ${p.status}`,
+                              `Méthode: ${p.method === 'bank_transfer' ? 'Virement' : p.method === 'paypal' ? 'PayPal' : 'Wallet'}`,
+                              `Statut: ${p.status === 'validated' ? 'Validé' : p.status === 'rejected' ? 'Refusé' : p.status === 'submitted' ? 'Preuve soumise' : p.status === 'archived' ? 'Archivé' : 'En attente'}`,
                               `Date: ${formatDate(p.createdAt)}`,
                               p.enrollment?.course?.title ? `Formation: ${p.enrollment.course.title}` : '',
-                              p.description ? `Description: ${p.description}` : '',
+                              p.description ? `\nPreuve: ${p.description}` : '',
+                              p.proofPath ? `\n📎 Preuve fichier disponible (cliquer sur l'icône FileCheck)'` : '',
                             ].filter(Boolean).join('\n');
                             alert(details);
                           }}
@@ -2336,9 +2337,17 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
-                        {/* Voir la preuve */}
-                        {p.proofPath && (
+                        {/* Voir la preuve (fichier) */}
+                        {p.proofPath && p.type !== 'payment_request' && (
                           <a href={`/api/admin/payments/${p.id}/proof?type=${p.type}`} target="_blank" rel="noopener noreferrer">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-500" title="Voir la preuve">
+                              <FileCheck className="h-4 w-4" />
+                            </Button>
+                          </a>
+                        )}
+                        {/* Voir la preuve (PaymentRequest — fichier ou texte) */}
+                        {p.proofPath && p.type === 'payment_request' && (
+                          <a href={`/api/admin/payment-requests/${p.id}/proof`} target="_blank" rel="noopener noreferrer">
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-500" title="Voir la preuve">
                               <FileCheck className="h-4 w-4" />
                             </Button>

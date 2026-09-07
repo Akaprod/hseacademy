@@ -28,11 +28,17 @@ export async function GET(request: NextRequest) {
 
     // ---- Filtre pour CoursePayment / AttestationPayment ----
     const where: Record<string, unknown> = {};
-    if (status) where.status = status;
+    if (status === 'pending') {
+      // "En attente" inclut pending ET submitted (preuve soumise = toujours en attente de validation)
+      where.status = { in: ['pending', 'submitted'] };
+    } else if (status) {
+      where.status = status;
+    }
 
     // ---- Filtre pour WalletTransaction (status déduit de la description) ----
     const walletWhere: Record<string, unknown> = { type: 'charge' };
     if (status === 'pending') {
+      // "En attente" inclut pending ET submitted (EN ATTENTE uniquement)
       walletWhere.description = { contains: 'EN ATTENTE' };
     } else if (status === 'validated') {
       walletWhere.description = { contains: 'VALIDÉ' };
@@ -124,7 +130,12 @@ export async function GET(request: NextRequest) {
 
     // ---- PaymentRequests (nouveau système de demandes) ----
     const prWhere: Record<string, unknown> = {};
-    if (status) prWhere.reqStatus = status;
+    if (status === 'pending') {
+      // "En attente" inclut à la fois les demandes pending et submitted
+      prWhere.reqStatus = { in: ['pending', 'submitted'] };
+    } else if (status) {
+      prWhere.reqStatus = status;
+    }
 
     const pr = await db.paymentRequest.findMany({
       where: prWhere,

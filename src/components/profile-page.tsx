@@ -934,42 +934,6 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
                   </p>
                 )}
 
-                <Separator />
-
-                {/* ======== Photo de profil ======== */}
-                <div className="flex items-center gap-4">
-                  <div className="h-20 w-20 rounded-full bg-emerald-100 flex items-center justify-center text-2xl font-bold text-emerald-700 overflow-hidden border-2 border-emerald-200">
-                    {profile?.avatar ? (
-                      <img src={profile.avatar} alt="Avatar" className="h-full w-full object-cover" />
-                    ) : (
-                      (profile?.fullName || user?.name || 'U').charAt(0).toUpperCase()
-                    )}
-                  </div>
-                  <div className="flex-1 space-y-2">
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      ref={(el) => { avatarInputRef.current = el; }}
-                      className="hidden"
-                      onChange={handleAvatarUpload}
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => avatarInputRef.current?.click()}
-                      disabled={avatarUploading}
-                    >
-                      {avatarUploading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                      {avatarUploading ? 'Upload...' : 'Changer la photo'}
-                    </Button>
-                    {profile?.avatar && (
-                      <Button variant="ghost" size="sm" onClick={handleAvatarDelete} className="text-red-500 hover:bg-red-50">
-                        Supprimer
-                      </Button>
-                    )}
-                    <p className="text-xs text-slate-400">JPG, PNG ou WebP. Max 2 MB. Min 200x200px.</p>
-                  </div>
-                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -1168,7 +1132,7 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
 
                   {/* Lien public + toggle */}
                   {profile?.username && (
-                    <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between">
+                    <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between">
                       <div>
                         <p className="text-sm font-medium text-emerald-700">Votre CV : <a href={`https://hseacademy.online/@${profile.username}`} target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:underline">hseacademy.online/@{profile.username}</a></p>
                       </div>

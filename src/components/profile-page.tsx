@@ -20,11 +20,12 @@ import { toast } from 'sonner';
 import {
   Mail, Phone, Shield, ShieldCheck, ShieldAlert, Lock, User, Calendar,
   MapPin, Home, Facebook, Linkedin, Twitter, Globe, Award, Play,
-  FileCheck, ExternalLink, Loader2, CheckCircle, BookOpen, Wallet,
+  FileCheck, ExternalLink, Loader2, CheckCircle, BookOpen, Wallet, Upload, Trash2,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -204,6 +205,17 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
   const [chargeInstructions, setChargeInstructions] = useState<any>(null);
   const [chargeWhatsapp, setChargeWhatsapp] = useState('');
 
+  // --- Payment Requests ---
+  const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
+  const [activeRequestsCount, setActiveRequestsCount] = useState(0);
+  const [maxRequests, setMaxRequests] = useState(10);
+  const [requestsLoading, setRequestsLoading] = useState(false);
+  const [proofModalOpen, setProofModalOpen] = useState(false);
+  const [proofRequestId, setProofRequestId] = useState<string | null>(null);
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [proofText, setProofText] = useState('');
+  const [submittingProof, setSubmittingProof] = useState(false);
+
   // Sync tab when initialTab changes (e.g., navigating from header dropdown)
   useEffect(() => {
     if (initialTab) setActiveTab(initialTab);
@@ -282,7 +294,7 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
     fetchWallet();
   }, [fetchWallet]);
 
-  // ---- Charge wallet ----
+  // ---- Charge wallet (via PaymentRequest) ----
   const handleCharge = async () => {
     const num = parseFloat(chargeAmount);
     if (isNaN(num) || num < 10) {
@@ -291,25 +303,104 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
     }
     setCharging(true);
     try {
-      const res = await fetch('/api/wallet/charge', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: num, method: chargeMethod }),
-      });
+      const formData = new FormData();
+      formData.append('amount', String(num));
+      formData.append('method', chargeMethod);
+      formData.append('reqType', 'wallet_charge');
+
+      const res = await fetch('/api/payment-requests', { method: 'POST', body: formData });
       const data = await res.json();
-      if (res.ok && data.success) {
-        // La demande est PENDING — ne pas créditer le solde immédiatement
-        setChargeInstructions(data.instructions);
-        setChargeWhatsapp(data.whatsapp);
-        toast.success('Demande créée — suivez les instructions pour payer');
-        fetchWallet(); // recharger l'historique pour voir la demande pending
+      if (res.ok) {
+        setChargeModalOpen(false);
+        setChargeAmount('');
+        toast.success('Demande créée — suivez les instructions');
+        fetchRequests();
+        // Afficher instructions
+        const ps = await fetch('/api/payment-settings').then(r => r.json());
+        const s = ps.settings || {};
+        const instructions: Record<string, any> = {
+          paypal: { title: 'PayPal', amount: num, email: s.paypalEmail || 'ouamrhar@gmail.com' },
+          bank_transfer: { title: 'Virement', amount: num, bankName: s.bankName, iban: s.bankIban, accountName: s.bankAccountName },
+        };
+        setChargeInstructions(instructions[chargeMethod] || null);
+        setChargeWhatsapp(s.whatsappNumber || '+212728986565');
       } else {
-        toast.error(data.error || 'Échec du rechargement');
+        toast.error(data.error || 'Échec');
       }
     } catch {
       toast.error('Erreur réseau');
     } finally {
       setCharging(false);
+    }
+  };
+
+  // ---- Fetch payment requests ----
+  const fetchRequests = useCallback(async () => {
+    setRequestsLoading(true);
+    try {
+      const res = await fetch('/api/payment-requests', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        setPaymentRequests(data.requests || []);
+        setActiveRequestsCount(data.activeCount || 0);
+        setMaxRequests(data.maxActive || 10);
+      }
+    } catch { /* ignore */ }
+    finally { setRequestsLoading(false); }
+  }, []);
+
+  useEffect(() => { fetchRequests(); }, [fetchRequests]);
+
+  // ---- Submit proof ----
+  const handleSubmitProof = async () => {
+    if (!proofRequestId) return;
+    if (!proofFile && !proofText.trim()) {
+      toast.error('Fournissez une preuve (image ou texte)');
+      return;
+    }
+    setSubmittingProof(true);
+    try {
+      const formData = new FormData();
+      formData.append('id', proofRequestId);
+      formData.append('amount', '0');
+      formData.append('method', 'paypal');
+      formData.append('reqType', 'wallet_charge');
+      if (proofFile) formData.append('proof', proofFile);
+      if (proofText.trim()) formData.append('proofText', proofText.trim());
+
+      const res = await fetch('/api/payment-requests', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success('Preuve soumise — en attente de validation');
+        setProofModalOpen(false);
+        setProofFile(null);
+        setProofText('');
+        setProofRequestId(null);
+        fetchRequests();
+      } else {
+        toast.error(data.error || 'Échec');
+      }
+    } catch {
+      toast.error('Erreur réseau');
+    } finally {
+      setSubmittingProof(false);
+    }
+  };
+
+  // ---- Delete request ----
+  const handleDeleteRequest = async (id: string) => {
+    if (!confirm('Supprimer cette demande ?')) return;
+    try {
+      const res = await fetch(`/api/payment-requests?id=${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        toast.success('Demande supprimée');
+        fetchRequests();
+      } else {
+        const data = await res.json();
+        toast.error(data.error || 'Échec');
+      }
+    } catch {
+      toast.error('Erreur réseau');
     }
   };
 
@@ -529,6 +620,9 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
               </TabsTrigger>
               <TabsTrigger value="wallet" className="gap-1.5">
                 <Wallet className="h-4 w-4" /> Mon Wallet
+              </TabsTrigger>
+              <TabsTrigger value="requests" className="gap-1.5">
+                <FileCheck className="h-4 w-4" /> Mes Demandes
               </TabsTrigger>
             </TabsList>
           </div>
@@ -1249,6 +1343,90 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
               </Card>
             </div>
           </TabsContent>
+
+        {/* ============================ H: Mes Demandes ============================ */}
+          <TabsContent value="requests" className="mt-6">
+            <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      <FileCheck className="h-5 w-5 text-emerald-600" /> Mes Demandes de Paiement
+                    </span>
+                    <Badge variant="outline" className={activeRequestsCount >= maxRequests ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'}>
+                      {activeRequestsCount}/{maxRequests} actives
+                    </Badge>
+                  </CardTitle>
+                  <CardDescription>
+                    Chaque demande expire après 72 heures. Soumettez votre preuve après paiement.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {requestsLoading ? (
+                    <div className="flex items-center gap-2 text-slate-400"><Loader2 className="h-4 w-4 animate-spin" /> Chargement...</div>
+                  ) : paymentRequests.length === 0 ? (
+                    <p className="text-sm text-slate-500 text-center py-8">Aucune demande pour le moment</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {paymentRequests.map((r: any) => (
+                        <div key={r.id} className="flex items-center justify-between p-3 border border-slate-200 rounded-lg">
+                          <div>
+                            <p className="text-sm font-medium text-slate-900">
+                              {r.reqType === 'wallet_charge' ? 'Rechargement Wallet' : r.reqType === 'course_payment' ? 'Paiement Cours' : 'Attestation Imprimée'} — {r.amount} MAD
+                            </p>
+                            <p className="text-xs text-slate-500">{r.method === 'bank_transfer' ? 'Virement' : 'PayPal'}</p>
+                            <p className="text-xs text-slate-400">
+                              Créée le {new Date(r.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              {' • '}
+                              Expire le {new Date(r.expiresAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                            </p>
+                            {r.description && <p className="text-xs text-slate-400 mt-1">{r.description}</p>}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className={
+                              r.reqStatus === 'validated' ? 'bg-emerald-100 text-emerald-800' :
+                              r.reqStatus === 'rejected' ? 'bg-red-100 text-red-800' :
+                              r.reqStatus === 'submitted' ? 'bg-blue-100 text-blue-800' :
+                              r.reqStatus === 'expired' ? 'bg-slate-200 text-slate-600' :
+                              'bg-amber-100 text-amber-800'
+                            }>
+                              {r.reqStatus === 'validated' ? 'Validé' :
+                               r.reqStatus === 'rejected' ? 'Refusé' :
+                               r.reqStatus === 'submitted' ? 'Preuve soumise' :
+                               r.reqStatus === 'expired' ? 'Expirée' : 'En attente'}
+                            </Badge>
+                            {/* Submit proof button — only for pending */}
+                            {r.reqStatus === 'pending' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => { setProofRequestId(r.id); setProofModalOpen(true); }}
+                                className="text-emerald-600 border-emerald-300 hover:bg-emerald-50"
+                              >
+                                <Upload className="h-3 w-3 mr-1" /> Preuve
+                              </Button>
+                            )}
+                            {/* Delete button — only for pending and expired */}
+                            {(r.reqStatus === 'pending' || r.reqStatus === 'expired') && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleDeleteRequest(r.id)}
+                                className="text-red-500 hover:bg-red-50"
+                                title="Supprimer"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
         </Tabs>
       </div>
       {printModalAttId && (
@@ -1366,6 +1544,53 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
                   </Button>
                 </>
               )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Modal Preuve de paiement */}
+      {proofModalOpen && (
+        <Dialog open={proofModalOpen} onOpenChange={setProofModalOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Upload className="h-5 w-5 text-emerald-600" /> Soumettre une preuve de paiement
+              </DialogTitle>
+              <DialogDescription>
+                Uploadez une capture d'écran ou saisissez un numéro de transaction.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label htmlFor="proof-file">Preuve (image ou PDF)</Label>
+                <Input
+                  id="proof-file"
+                  type="file"
+                  accept="image/*,application/pdf"
+                  onChange={(e) => setProofFile(e.target.files?.[0] || null)}
+                />
+                {proofFile && (
+                  <p className="text-xs text-slate-500 mt-1">{proofFile.name} ({(proofFile.size / 1024).toFixed(0)} KB)</p>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="proof-text">Ou numéro de transaction (texte)</Label>
+                <Textarea
+                  id="proof-text"
+                  rows={3}
+                  value={proofText}
+                  onChange={(e) => setProofText(e.target.value)}
+                  placeholder="Ex : N° de virement 123456789 / ID PayPal 9XK1234ABCD"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setProofModalOpen(false)}>Annuler</Button>
+              <Button onClick={handleSubmitProof} disabled={submittingProof} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                {submittingProof ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                {submittingProof ? 'Envoi...' : 'Soumettre'}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

@@ -501,6 +501,43 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
     }
   };
 
+  // ---- Save all CV (username + cvTitle + cvBio + cvTemplate + social) ----
+  const handleSaveAllCV = async () => {
+    setSavingSocial(true);
+    try {
+      // 1. Save username si modifié
+      if (usernameValue.length >= 5) {
+        await fetch('/api/profile/username', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: usernameValue }),
+        });
+      }
+      // 2. Save CV fields
+      await fetch('/api/profile/username', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cvTitle: cvTitleValue,
+          cvBio: cvBioValue,
+          cvTemplate: cvTemplateValue,
+        }),
+      });
+      // 3. Save social links
+      await fetch('/api/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ facebook, linkedin, twitter, website }),
+      });
+      toast.success('Tout enregistré');
+      fetchProfile();
+    } catch {
+      toast.error('Erreur réseau');
+    } finally {
+      setSavingSocial(false);
+    }
+  };
+
   // ---- Avatar upload ----
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -758,8 +795,8 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
               <TabsTrigger value="identity" className="gap-1.5">
                 <User className="h-4 w-4" /> Mon identité
               </TabsTrigger>
-              <TabsTrigger value="social" className="gap-1.5">
-                <Globe className="h-4 w-4" /> Mes réseaux
+              <TabsTrigger value="cv" className="gap-1.5">
+                <Globe className="h-4 w-4" /> Mon CV
               </TabsTrigger>
               <TabsTrigger value="trainings" className="gap-1.5">
                 <BookOpen className="h-4 w-4" /> Mes formations
@@ -933,114 +970,6 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
                     <p className="text-xs text-slate-400">JPG, PNG ou WebP. Max 2 MB. Min 200x200px.</p>
                   </div>
                 </div>
-
-                <Separator />
-
-                {/* ======== CV Public — Username + Settings ======== */}
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                      <Globe className="h-4 w-4 text-emerald-600" /> CV Professionnel Public
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Partagez votre CV sur les réseaux sociaux avec un lien personnalisé.
-                    </p>
-                  </div>
-
-                  {/* Username */}
-                  <div className="flex items-end gap-2">
-                    <div className="flex-1">
-                      <Label htmlFor="username">Nom d'utilisateur (lien public)</Label>
-                      <div className="flex items-center mt-1">
-                        <span className="text-sm text-slate-400 bg-slate-100 border border-r-0 border-slate-200 rounded-l-md px-3 py-2">hseacademy.online/@</span>
-                        <Input
-                          id="username"
-                          value={usernameValue}
-                          onChange={(e) => setUsernameValue(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-                          placeholder="akaprod"
-                          maxLength={12}
-                          minLength={5}
-                          className="rounded-l-none"
-                        />
-                      </div>
-                      <p className="text-xs text-slate-400 mt-1">5 à 12 caractères, lettres, chiffres et _ uniquement.</p>
-                    </div>
-                    <Button
-                      size="sm"
-                      onClick={handleSaveUsername}
-                      disabled={usernameSaving || usernameValue.length < 5}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                    >
-                      {usernameSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Enregistrer'}
-                    </Button>
-                  </div>
-
-                  {/* Lien public si username configuré */}
-                  {profile?.username && (
-                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-emerald-700">Votre CV est disponible sur :</p>
-                        <a href={`https://hseacademy.online/@${profile.username}`} target="_blank" rel="noopener noreferrer" className="text-sm text-emerald-600 hover:underline">
-                          hseacademy.online/@{profile.username}
-                        </a>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(`https://hseacademy.online/@${profile.username}`); toast.success('Lien copié'); }}>
-                          Copier le lien
-                        </Button>
-                        <div className="flex items-center gap-1">
-                          <Label htmlFor="profile-public" className="text-xs text-slate-600">Public</Label>
-                          <input
-                            id="profile-public"
-                            type="checkbox"
-                            checked={profilePublicValue}
-                            onChange={(e) => { setProfilePublicValue(e.target.checked); handleToggleProfilePublic(e.target.checked); }}
-                            className="h-4 w-4"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Titre + Bio */}
-                  {profile?.username && (
-                    <div className="grid grid-cols-1 gap-3">
-                      <div>
-                        <Label htmlFor="cv-title">Titre professionnel</Label>
-                        <Input
-                          id="cv-title"
-                          value={cvTitleValue}
-                          onChange={(e) => setCvTitleValue(e.target.value)}
-                          placeholder="Ex: Technicien QHSE Senior"
-                          onBlur={() => handleSaveCVField('cvTitle', cvTitleValue)}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="cv-bio">Bio courte</Label>
-                        <Textarea
-                          id="cv-bio"
-                          rows={3}
-                          value={cvBioValue}
-                          onChange={(e) => setCvBioValue(e.target.value)}
-                          placeholder="Décrivez votre parcours en quelques lignes..."
-                          onBlur={() => handleSaveCVField('cvBio', cvBioValue)}
-                        />
-                      </div>
-                      {/* Template */}
-                      <div>
-                        <Label htmlFor="cv-template">Template du CV</Label>
-                        <Select value={cvTemplateValue} onValueChange={(v) => { setCvTemplateValue(v); handleSaveCVField('cvTemplate', v); }}>
-                          <SelectTrigger id="cv-template"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="modern">Moderne (Emerald cards)</SelectItem>
-                            <SelectItem value="classic">Classique (Colonnes sombres)</SelectItem>
-                            <SelectItem value="minimal">Minimaliste (Épuré)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  )}
-                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -1180,82 +1109,140 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
             </Card>
           </TabsContent>
 
-          {/* ============================ C: Réseaux sociaux ============================ */}
-          <TabsContent value="social" className="mt-6">
-            <Card className="border-slate-200 shadow-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-emerald-700">
-                  <Globe className="h-5 w-5" /> Mes réseaux sociaux
-                </CardTitle>
-                <CardDescription>
-                  Ajoutez vos liens professionnels pour enrichir votre profil.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="facebook" className="gap-1.5">
-                      <Facebook className="h-4 w-4 text-blue-600" /> Facebook
-                    </Label>
-                    <Input
-                      id="facebook"
-                      value={facebook}
-                      onChange={(e) => setFacebook(e.target.value)}
-                      placeholder="https://facebook.com/…"
-                    />
+          {/* ============================ C: Mon CV ============================ */}
+          <TabsContent value="cv" className="mt-6">
+            <div className="space-y-6">
+              {/* Photo de profil */}
+              <Card className="border-slate-200 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-emerald-700">
+                    <User className="h-5 w-5" /> Photo de profil
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-4">
+                    <div className="h-24 w-24 rounded-full bg-emerald-100 flex items-center justify-center text-3xl font-bold text-emerald-700 overflow-hidden border-2 border-emerald-200">
+                      {profile?.avatar ? (
+                        <img src={profile.avatar} alt="Avatar" className="h-full w-full object-cover" />
+                      ) : (
+                        (profile?.fullName || user?.name || 'U').charAt(0).toUpperCase()
+                      )}
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <input type="file" accept="image/jpeg,image/png,image/webp" ref={(el) => { avatarInputRef.current = el; }} className="hidden" onChange={handleAvatarUpload} />
+                      <Button variant="outline" size="sm" onClick={() => avatarInputRef.current?.click()} disabled={avatarUploading}>
+                        {avatarUploading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                        {avatarUploading ? 'Upload...' : 'Changer la photo'}
+                      </Button>
+                      {profile?.avatar && (
+                        <Button variant="ghost" size="sm" onClick={handleAvatarDelete} className="text-red-500 hover:bg-red-50">
+                          Supprimer
+                        </Button>
+                      )}
+                      <p className="text-xs text-slate-400">JPG, PNG ou WebP. Max 2 MB. Min 200x200px.</p>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="linkedin" className="gap-1.5">
-                      <Linkedin className="h-4 w-4 text-sky-700" /> LinkedIn
-                    </Label>
-                    <Input
-                      id="linkedin"
-                      value={linkedin}
-                      onChange={(e) => setLinkedin(e.target.value)}
-                      placeholder="https://linkedin.com/in/…"
-                    />
+                </CardContent>
+              </Card>
+
+              {/* CV Public */}
+              <Card className="border-emerald-200 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-emerald-700">
+                    <Globe className="h-5 w-5" /> CV Professionnel Public
+                  </CardTitle>
+                  <CardDescription>
+                    Votre CV professionnel partageable sur les réseaux sociaux.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-5">
+                  {/* Username */}
+                  <div>
+                    <Label htmlFor="username">Lien public de votre CV</Label>
+                    <div className="flex items-center mt-1">
+                      <span className="text-sm text-slate-400 bg-slate-100 border border-r-0 border-slate-200 rounded-l-md px-3 py-2">hseacademy.online/@</span>
+                      <Input id="username" value={usernameValue} onChange={(e) => setUsernameValue(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))} placeholder="akaprod" maxLength={12} className="rounded-l-none" />
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">5 à 12 caractères, lettres, chiffres et _ uniquement.</p>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="twitter" className="gap-1.5">
-                      <Twitter className="h-4 w-4 text-slate-700" /> Twitter / X
-                    </Label>
-                    <Input
-                      id="twitter"
-                      value={twitter}
-                      onChange={(e) => setTwitter(e.target.value)}
-                      placeholder="https://twitter.com/…"
-                    />
+
+                  {/* Lien public + toggle */}
+                  {profile?.username && (
+                    <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-emerald-700">Votre CV :</p>
+                        <a href={`https://hseacademy.online/@${profile.username}`} target="_blank" rel="noopener noreferrer" className="text-sm text-emerald-600 hover:underline">
+                          hseacademy.online/@{profile.username}
+                        </a>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(`https://hseacademy.online/@${profile.username}`); toast.success('Lien copié'); }}>
+                          Copier
+                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Label htmlFor="profile-public" className="text-xs text-slate-600 cursor-pointer">Public</Label>
+                          <input id="profile-public" type="checkbox" checked={profilePublicValue} onChange={(e) => { setProfilePublicValue(e.target.checked); handleToggleProfilePublic(e.target.checked); }} className="h-4 w-4" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Titre + Bio + Template */}
+                  <div className="grid grid-cols-1 gap-3">
+                    <div>
+                      <Label htmlFor="cv-title">Titre professionnel</Label>
+                      <Input id="cv-title" value={cvTitleValue} onChange={(e) => setCvTitleValue(e.target.value)} placeholder="Ex: Technicien QHSE Senior" />
+                    </div>
+                    <div>
+                      <Label htmlFor="cv-bio">Bio courte</Label>
+                      <Textarea id="cv-bio" rows={3} value={cvBioValue} onChange={(e) => setCvBioValue(e.target.value)} placeholder="Décrivez votre parcours..." />
+                    </div>
+                    <div>
+                      <Label htmlFor="cv-template">Template du CV</Label>
+                      <Select value={cvTemplateValue} onValueChange={(v) => setCvTemplateValue(v)}>
+                        <SelectTrigger id="cv-template"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="modern">Moderne (Emerald cards)</SelectItem>
+                          <SelectItem value="classic">Classique (Colonnes sombres)</SelectItem>
+                          <SelectItem value="minimal">Minimaliste (Épuré)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="website" className="gap-1.5">
-                      <Globe className="h-4 w-4 text-emerald-600" /> Site web
-                    </Label>
-                    <Input
-                      id="website"
-                      value={website}
-                      onChange={(e) => setWebsite(e.target.value)}
-                      placeholder="https://votre-site.com"
-                    />
+
+                  {/* Réseaux sociaux intégrés au CV */}
+                  <Separator />
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-700 mb-3">Réseaux sociaux & liens</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="facebook" className="gap-1.5"><Facebook className="h-4 w-4 text-blue-600" /> Facebook</Label>
+                        <Input id="facebook" value={facebook} onChange={(e) => setFacebook(e.target.value)} placeholder="https://facebook.com/…" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="linkedin" className="gap-1.5"><Linkedin className="h-4 w-4 text-sky-700" /> LinkedIn</Label>
+                        <Input id="linkedin" value={linkedin} onChange={(e) => setLinkedin(e.target.value)} placeholder="https://linkedin.com/in/…" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="twitter" className="gap-1.5"><Twitter className="h-4 w-4 text-slate-700" /> Twitter / X</Label>
+                        <Input id="twitter" value={twitter} onChange={(e) => setTwitter(e.target.value)} placeholder="https://twitter.com/…" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="website" className="gap-1.5"><Globe className="h-4 w-4 text-emerald-600" /> Site web</Label>
+                        <Input id="website" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://votre-site.com" />
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div className="flex justify-end">
-                  <Button
-                    type="button"
-                    onClick={handleSaveSocial}
-                    disabled={savingSocial}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                  >
-                    {savingSocial ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" /> Enregistrement…
-                      </>
-                    ) : (
-                      <>Enregistrer</>
-                    )}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+
+                  {/* Bouton Enregistrer — à la fin, prend en compte tout */}
+                  <div className="flex justify-end pt-2">
+                    <Button onClick={handleSaveAllCV} disabled={savingSocial || usernameSaving} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                      {savingSocial || usernameSaving ? (<><Loader2 className="h-4 w-4 animate-spin mr-2" /> Enregistrement…</>) : (<>Enregistrer tout</>)}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           {/* ============================ D: Mes formations ============================ */}

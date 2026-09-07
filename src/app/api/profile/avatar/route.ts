@@ -10,7 +10,7 @@ import { randomBytes } from 'node:crypto';
 // DELETE /api/profile/avatar — Supprimer photo de profil
 // ============================================================================
 
-const AVATAR_DIR = process.env.AVATAR_UPLOAD_DIR || `${process.env.HOME}/domains/hseacademy.online/public_html/avatars`;
+const AVATAR_DIR = process.env.AVATAR_UPLOAD_DIR || '/home/u398373271/domains/hseacademy.online/public_html/avatars';
 const MAX_SIZE = 2 * 1024 * 1024; // 2 MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 

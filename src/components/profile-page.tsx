@@ -15,7 +15,7 @@
 // Toutes les écritures notifient via sonner.
 // ============================================================================
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import {
   Mail, Phone, Shield, ShieldCheck, ShieldAlert, Lock, User, Calendar,
@@ -216,6 +216,18 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
   const [proofText, setProofText] = useState('');
   const [submittingProof, setSubmittingProof] = useState(false);
 
+  // --- CV Public ---
+  const [usernameValue, setUsernameValue] = useState('');
+  const [usernameSaving, setUsernameSaving] = useState(false);
+  const [profilePublicValue, setProfilePublicValue] = useState(false);
+  const [cvTitleValue, setCvTitleValue] = useState('');
+  const [cvBioValue, setCvBioValue] = useState('');
+  const [cvTemplateValue, setCvTemplateValue] = useState('modern');
+
+  // --- Avatar ---
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+
   // Sync tab when initialTab changes (e.g., navigating from header dropdown)
   useEffect(() => {
     if (initialTab) setActiveTab(initialTab);
@@ -274,6 +286,12 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
     setLinkedin(p.linkedin || '');
     setTwitter(p.twitter || '');
     setWebsite(p.website || '');
+    // CV fields
+    setUsernameValue(p.username || '');
+    setProfilePublicValue(p.profilePublic || false);
+    setCvTitleValue(p.cvTitle || '');
+    setCvBioValue(p.cvBio || '');
+    setCvTemplateValue(p.cvTemplate || 'modern');
   }, [data?.profile, user?.name]);
 
   // ---- Fetch wallet ----
@@ -421,6 +439,114 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
       } else {
         const data = await res.json();
         toast.error(data.error || 'Échec');
+      }
+    } catch {
+      toast.error('Erreur réseau');
+    }
+  };
+
+  // ---- Save username ----
+  const handleSaveUsername = async () => {
+    if (usernameValue.length < 5 || usernameValue.length > 12) {
+      toast.error('5 à 12 caractères requis');
+      return;
+    }
+    setUsernameSaving(true);
+    try {
+      const res = await fetch('/api/profile/username', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: usernameValue }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success('Nom d\'utilisateur enregistré');
+        fetchProfile(); // recharger pour voir le lien
+      } else {
+        toast.error(data.error || 'Échec');
+      }
+    } catch {
+      toast.error('Erreur réseau');
+    } finally {
+      setUsernameSaving(false);
+    }
+  };
+
+  // ---- Toggle profile public ----
+  const handleToggleProfilePublic = async (value: boolean) => {
+    try {
+      await fetch('/api/profile/username', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profilePublic: value }),
+      });
+      toast.success(value ? 'CV rendu public' : 'CV rendu privé');
+      fetchProfile();
+    } catch {
+      toast.error('Erreur réseau');
+    }
+  };
+
+  // ---- Save CV field ----
+  const handleSaveCVField = async (field: string, value: string) => {
+    try {
+      await fetch('/api/profile/username', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: value }),
+      });
+      toast.success('Enregistré');
+    } catch {
+      toast.error('Erreur réseau');
+    }
+  };
+
+  // ---- Avatar upload ----
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validation
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Fichier trop volumineux (max 2 MB)');
+      return;
+    }
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      toast.error('Format non supporté (JPG, PNG, WebP uniquement)');
+      return;
+    }
+
+    setAvatarUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('avatar', file);
+
+      const res = await fetch('/api/profile/avatar', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success('Photo de profil mise à jour');
+        fetchProfile();
+      } else {
+        toast.error(data.error || 'Échec de l\'upload');
+      }
+    } catch {
+      toast.error('Erreur réseau');
+    } finally {
+      setAvatarUploading(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = '';
+    }
+  };
+
+  // ---- Avatar delete ----
+  const handleAvatarDelete = async () => {
+    if (!confirm('Supprimer votre photo de profil ?')) return;
+    try {
+      const res = await fetch('/api/profile/avatar', { method: 'DELETE' });
+      if (res.ok) {
+        toast.success('Photo supprimée');
+        fetchProfile();
+      } else {
+        toast.error('Échec');
       }
     } catch {
       toast.error('Erreur réseau');
@@ -770,6 +896,151 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
                     Votre adresse email est vérifiée. Aucune action supplémentaire n&apos;est requise.
                   </p>
                 )}
+
+                <Separator />
+
+                {/* ======== Photo de profil ======== */}
+                <div className="flex items-center gap-4">
+                  <div className="h-20 w-20 rounded-full bg-emerald-100 flex items-center justify-center text-2xl font-bold text-emerald-700 overflow-hidden border-2 border-emerald-200">
+                    {profile?.avatar ? (
+                      <img src={profile.avatar} alt="Avatar" className="h-full w-full object-cover" />
+                    ) : (
+                      (profile?.fullName || user?.name || 'U').charAt(0).toUpperCase()
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      ref={(el) => { avatarInputRef.current = el; }}
+                      className="hidden"
+                      onChange={handleAvatarUpload}
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => avatarInputRef.current?.click()}
+                      disabled={avatarUploading}
+                    >
+                      {avatarUploading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                      {avatarUploading ? 'Upload...' : 'Changer la photo'}
+                    </Button>
+                    {profile?.avatar && (
+                      <Button variant="ghost" size="sm" onClick={handleAvatarDelete} className="text-red-500 hover:bg-red-50">
+                        Supprimer
+                      </Button>
+                    )}
+                    <p className="text-xs text-slate-400">JPG, PNG ou WebP. Max 2 MB. Min 200x200px.</p>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* ======== CV Public — Username + Settings ======== */}
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                      <Globe className="h-4 w-4 text-emerald-600" /> CV Professionnel Public
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Partagez votre CV sur les réseaux sociaux avec un lien personnalisé.
+                    </p>
+                  </div>
+
+                  {/* Username */}
+                  <div className="flex items-end gap-2">
+                    <div className="flex-1">
+                      <Label htmlFor="username">Nom d'utilisateur (lien public)</Label>
+                      <div className="flex items-center mt-1">
+                        <span className="text-sm text-slate-400 bg-slate-100 border border-r-0 border-slate-200 rounded-l-md px-3 py-2">hseacademy.online/@</span>
+                        <Input
+                          id="username"
+                          value={usernameValue}
+                          onChange={(e) => setUsernameValue(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                          placeholder="akaprod"
+                          maxLength={12}
+                          minLength={5}
+                          className="rounded-l-none"
+                        />
+                      </div>
+                      <p className="text-xs text-slate-400 mt-1">5 à 12 caractères, lettres, chiffres et _ uniquement.</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={handleSaveUsername}
+                      disabled={usernameSaving || usernameValue.length < 5}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                    >
+                      {usernameSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Enregistrer'}
+                    </Button>
+                  </div>
+
+                  {/* Lien public si username configuré */}
+                  {profile?.username && (
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-emerald-700">Votre CV est disponible sur :</p>
+                        <a href={`https://hseacademy.online/@${profile.username}`} target="_blank" rel="noopener noreferrer" className="text-sm text-emerald-600 hover:underline">
+                          hseacademy.online/@{profile.username}
+                        </a>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(`https://hseacademy.online/@${profile.username}`); toast.success('Lien copié'); }}>
+                          Copier le lien
+                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Label htmlFor="profile-public" className="text-xs text-slate-600">Public</Label>
+                          <input
+                            id="profile-public"
+                            type="checkbox"
+                            checked={profilePublicValue}
+                            onChange={(e) => { setProfilePublicValue(e.target.checked); handleToggleProfilePublic(e.target.checked); }}
+                            className="h-4 w-4"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Titre + Bio */}
+                  {profile?.username && (
+                    <div className="grid grid-cols-1 gap-3">
+                      <div>
+                        <Label htmlFor="cv-title">Titre professionnel</Label>
+                        <Input
+                          id="cv-title"
+                          value={cvTitleValue}
+                          onChange={(e) => setCvTitleValue(e.target.value)}
+                          placeholder="Ex: Technicien QHSE Senior"
+                          onBlur={() => handleSaveCVField('cvTitle', cvTitleValue)}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="cv-bio">Bio courte</Label>
+                        <Textarea
+                          id="cv-bio"
+                          rows={3}
+                          value={cvBioValue}
+                          onChange={(e) => setCvBioValue(e.target.value)}
+                          placeholder="Décrivez votre parcours en quelques lignes..."
+                          onBlur={() => handleSaveCVField('cvBio', cvBioValue)}
+                        />
+                      </div>
+                      {/* Template */}
+                      <div>
+                        <Label htmlFor="cv-template">Template du CV</Label>
+                        <Select value={cvTemplateValue} onValueChange={(v) => { setCvTemplateValue(v); handleSaveCVField('cvTemplate', v); }}>
+                          <SelectTrigger id="cv-template"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="modern">Moderne (Emerald cards)</SelectItem>
+                            <SelectItem value="classic">Classique (Colonnes sombres)</SelectItem>
+                            <SelectItem value="minimal">Minimaliste (Épuré)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

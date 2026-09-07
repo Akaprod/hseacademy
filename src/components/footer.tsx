@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Shield, Phone, Mail, MapPin, Send, ArrowUp, GraduationCap, BookOpen } from 'lucide-react';
+import { Shield, Phone, Mail, MapPin, Send, ArrowUp, GraduationCap, BookOpen, Facebook, Linkedin, Instagram, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface FooterProps {
@@ -163,6 +163,27 @@ export default function Footer({ onNavigate }: FooterProps) {
                   <Mail className="h-4 w-4 text-emerald-400 shrink-0" />
                   contact@institutqhse.com
                 </a>
+              </li>
+              {/* Réseaux sociaux IICP */}
+              <li className="pt-2">
+                <p className="text-xs text-slate-500 mb-2">Suivez-nous</p>
+                <div className="flex items-center gap-3">
+                  <a href="https://www.facebook.com/iicp.qhse" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-blue-500 transition-colors" title="Facebook">
+                    <Facebook className="h-5 w-5" />
+                  </a>
+                  <a href="https://www.tiktok.com/@iicp.qhse" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-white transition-colors" title="TikTok">
+                    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.62 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5.8 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1.84-.1z"/></svg>
+                  </a>
+                  <a href="https://instagram.com/iicpgroup" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-pink-500 transition-colors" title="Instagram">
+                    <Instagram className="h-5 w-5" />
+                  </a>
+                  <a href="https://www.linkedin.com/in/iicpgroup/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-blue-600 transition-colors" title="LinkedIn">
+                    <Linkedin className="h-5 w-5" />
+                  </a>
+                  <a href="https://chat.whatsapp.com/F1NW3hOLa3o5SUMV05i4t8" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-green-500 transition-colors" title="WhatsApp">
+                    <MessageCircle className="h-5 w-5" />
+                  </a>
+                </div>
               </li>
             </ul>
           </div>

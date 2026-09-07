@@ -122,9 +122,39 @@ export async function GET(request: NextRequest) {
       total += wcCount;
     }
 
+    // ---- PaymentRequests (nouveau système de demandes) ----
+    const prWhere: Record<string, unknown> = {};
+    if (status) prWhere.reqStatus = status;
+
+    const pr = await db.paymentRequest.findMany({
+      where: prWhere,
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+    const paymentRequests = pr.map(r => ({
+      id: r.id,
+      userId: r.userId,
+      user: r.user,
+      amount: r.amount,
+      currency: 'MAD',
+      method: r.method,
+      status: r.reqStatus,
+      type: 'payment_request',
+      description: r.description || '',
+      createdAt: r.createdAt,
+      validatedAt: r.validatedAt,
+      proofPath: r.proofPath,
+    }));
+    const prCount = await db.paymentRequest.count({ where: prWhere });
+    total += prCount;
+
     // Merge, filter by status if needed (for wallet, already filtered via DB)
     // and sort by createdAt desc
-    let allPayments = [...coursePayments, ...attestationPayments, ...walletCharges]
+    let allPayments = [...coursePayments, ...attestationPayments, ...walletCharges, ...paymentRequests]
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     // Apply client-side filter for wallet items if status filter is active

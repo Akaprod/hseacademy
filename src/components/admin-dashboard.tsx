@@ -2199,8 +2199,9 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
   const validatePayment = async (id: string, type: string) => {
     try {
       if (type === 'wallet') {
-        // Validation wallet : créditer le solde + bonus
         await api(`/api/admin/payments/${id}`, { method: 'PATCH', body: JSON.stringify({ action: 'validate', type: 'wallet' }) });
+      } else if (type === 'payment_request') {
+        await api('/api/admin/payment-requests', { method: 'PATCH', body: JSON.stringify({ id, action: 'validate' }) });
       } else {
         await api(`/api/admin/payments/${id}`, { method: 'PATCH', body: JSON.stringify({ action: 'validate', type }) });
       }
@@ -2215,7 +2216,11 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
     const reason = window.prompt('Motif du refus ?');
     if (!reason) return;
     try {
-      await api(`/api/admin/payments/${id}`, { method: 'PATCH', body: JSON.stringify({ action: 'reject', type, rejectionReason: reason }) });
+      if (type === 'payment_request') {
+        await api('/api/admin/payment-requests', { method: 'PATCH', body: JSON.stringify({ id, action: 'reject', rejectionReason: reason }) });
+      } else {
+        await api(`/api/admin/payments/${id}`, { method: 'PATCH', body: JSON.stringify({ action: 'reject', type, rejectionReason: reason }) });
+      }
       toast.success('Paiement refusé');
       fetchPayments();
     } catch (e: unknown) {
@@ -2292,7 +2297,7 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
                 ) : payments.map((p: any) => (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">{p.user?.name || '—'}</TableCell>
-                    <TableCell className="hidden md:table-cell text-sm">{p.type === 'course' ? 'Cours' : p.type === 'attestation' ? 'Impression' : p.type === 'wallet' ? 'Rechargement Wallet' : p.type}</TableCell>
+                    <TableCell className="hidden md:table-cell text-sm">{p.type === 'course' ? 'Cours' : p.type === 'attestation' ? 'Impression' : p.type === 'wallet' ? 'Rechargement Wallet' : p.type === 'payment_request' ? 'Demande Client' : p.type}</TableCell>
                     <TableCell className="text-sm">{p.amount} MAD</TableCell>
                     <TableCell className="text-sm">{p.method === 'bank_transfer' ? 'Virement' : p.method === 'paypal' ? 'PayPal' : p.method === 'wallet' ? 'Wallet' : p.method}</TableCell>
                     <TableCell>
@@ -2301,8 +2306,9 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
                         p.status === 'rejected' ? 'bg-red-100 text-red-800' :
                         p.status === 'submitted' ? 'bg-blue-100 text-blue-800' :
                         p.status === 'archived' ? 'bg-slate-200 text-slate-600' :
+                        p.status === 'expired' ? 'bg-slate-200 text-slate-500' :
                         'bg-amber-100 text-amber-800'
-                      }>{p.status === 'validated' ? 'Validé' : p.status === 'rejected' ? 'Refusé' : p.status === 'submitted' ? 'Preuve soumise' : p.status === 'archived' ? 'Archivé' : 'En attente'}</Badge>
+                      }>{p.status === 'validated' ? 'Validé' : p.status === 'rejected' ? 'Refusé' : p.status === 'submitted' ? 'Preuve soumise' : p.status === 'archived' ? 'Archivé' : p.status === 'expired' ? 'Expiré' : 'En attente'}</Badge>
                     </TableCell>
                     <TableCell className="hidden sm:table-cell text-sm text-slate-500">{formatDate(p.createdAt)}</TableCell>
                     <TableCell className="text-right">

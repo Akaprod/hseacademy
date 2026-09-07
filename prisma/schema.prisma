@@ -312,6 +312,15 @@ model UserProfile {
   twitter         String?
   website         String?
 
+  // CV Public — username + visibilité
+  username        String?  @unique // 5-12 caractères, lettres + chiffres + underscore
+  profilePublic   Boolean  @default(false) // CV visible publiquement sur /@username
+  cvTemplate      String   @default("modern") // modern | classic | minimal
+  cvTitle         String?  // Titre professionnel (ex: "Technicien QHSE")
+  cvBio           String?  // Bio courte pour le CV
+  cvSkills        String   @default("[]") // JSON array de compétences
+  cvExperience    String   @default("[]") // JSON array d'expériences
+
   // Vérification
   emailVerified   Boolean  @default(false)
   emailVerifiedAt DateTime?

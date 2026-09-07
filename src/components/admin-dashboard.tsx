@@ -2291,11 +2291,35 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
                         p.status === 'rejected' ? 'bg-red-100 text-red-800' :
                         p.status === 'submitted' ? 'bg-blue-100 text-blue-800' :
                         'bg-amber-100 text-amber-800'
-                      }>{p.status}</Badge>
+                      }>{p.status === 'validated' ? 'Validé' : p.status === 'rejected' ? 'Refusé' : p.status === 'submitted' ? 'Preuve soumise' : 'En attente'}</Badge>
                     </TableCell>
                     <TableCell className="hidden sm:table-cell text-sm text-slate-500">{formatDate(p.createdAt)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
+                        {/* Détails */}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-slate-500"
+                          onClick={() => {
+                            const details = [
+                              `Utilisateur: ${p.user?.name || '—'}`,
+                              `Email: ${p.user?.email || '—'}`,
+                              `Type: ${p.type === 'course' ? 'Cours' : p.type === 'attestation' ? 'Impression' : 'Rechargement Wallet'}`,
+                              `Montant: ${p.amount} MAD`,
+                              `Méthode: ${p.method}`,
+                              `Statut: ${p.status}`,
+                              `Date: ${formatDate(p.createdAt)}`,
+                              p.enrollment?.course?.title ? `Formation: ${p.enrollment.course.title}` : '',
+                              p.description ? `Description: ${p.description}` : '',
+                            ].filter(Boolean).join('\n');
+                            alert(details);
+                          }}
+                          title="Détails"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        {/* Voir la preuve */}
                         {p.proofPath && (
                           <a href={`/api/admin/payments/${p.id}/proof?type=${p.type}`} target="_blank" rel="noopener noreferrer">
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-500" title="Voir la preuve">
@@ -2303,15 +2327,17 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
                             </Button>
                           </a>
                         )}
-                        {p.status === 'submitted' && (
-                          <>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-500" onClick={() => validatePayment(p.id, p.type)} title="Valider">
-                              <Check className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => rejectPayment(p.id, p.type)} title="Refuser">
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </>
+                        {/* Valider — affiché pour pending ET submitted */}
+                        {(p.status === 'pending' || p.status === 'submitted') && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-500" onClick={() => validatePayment(p.id, p.type)} title="Valider">
+                            <Check className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {/* Refuser — affiché pour pending ET submitted */}
+                        {(p.status === 'pending' || p.status === 'submitted') && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => rejectPayment(p.id, p.type)} title="Refuser">
+                            <X className="h-4 w-4" />
+                          </Button>
                         )}
                       </div>
                     </TableCell>

@@ -315,7 +315,10 @@ model UserProfile {
   // CV Public — username + visibilité
   username        String?  @unique // 5-12 caractères, lettres + chiffres + underscore
   profilePublic   Boolean  @default(false) // CV visible publiquement sur /@username
-  cvTemplate      String   @default("modern") // modern | classic | minimal
+  cvTemplate      String   @default("emerald") // emerald | ocean | sunset | royal | mono
+  cvColorPrimary  String   @default("#059669") // Couleur principale (ex: emerald-600)
+  cvColorAccent   String   @default("#065f46") // Couleur accent (ex: emerald-800)
+  cvLayout        String   @default("sidebar") // sidebar | centered | split
   cvTitle         String?  // Titre professionnel (ex: "Technicien QHSE")
   cvBio           String?  // Bio courte pour le CV
   cvSkills        String   @default("[]") // JSON array de compétences

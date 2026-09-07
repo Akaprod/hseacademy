@@ -222,7 +222,10 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
   const [profilePublicValue, setProfilePublicValue] = useState(false);
   const [cvTitleValue, setCvTitleValue] = useState('');
   const [cvBioValue, setCvBioValue] = useState('');
-  const [cvTemplateValue, setCvTemplateValue] = useState('modern');
+  const [cvTemplateValue, setCvTemplateValue] = useState('emerald');
+  const [cvColorPrimaryValue, setCvColorPrimaryValue] = useState('#059669');
+  const [cvColorAccentValue, setCvColorAccentValue] = useState('#065f46');
+  const [cvLayoutValue, setCvLayoutValue] = useState('sidebar');
 
   // --- Avatar ---
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -291,7 +294,10 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
     setProfilePublicValue(p.profilePublic || false);
     setCvTitleValue(p.cvTitle || '');
     setCvBioValue(p.cvBio || '');
-    setCvTemplateValue(p.cvTemplate || 'modern');
+    setCvTemplateValue(p.cvTemplate || 'emerald');
+    setCvColorPrimaryValue(p.cvColorPrimary || '#059669');
+    setCvColorAccentValue(p.cvColorAccent || '#065f46');
+    setCvLayoutValue(p.cvLayout || 'sidebar');
   }, [data?.profile, user?.name]);
 
   // ---- Fetch wallet ----
@@ -521,6 +527,9 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
           cvTitle: cvTitleValue,
           cvBio: cvBioValue,
           cvTemplate: cvTemplateValue,
+          cvColorPrimary: cvColorPrimaryValue,
+          cvColorAccent: cvColorAccentValue,
+          cvLayout: cvLayoutValue,
         }),
       });
       // 3. Save social links
@@ -1158,16 +1167,83 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
                       <Label htmlFor="cv-bio">Bio courte</Label>
                       <Textarea id="cv-bio" rows={3} value={cvBioValue} onChange={(e) => setCvBioValue(e.target.value)} placeholder="Décrivez votre parcours..." />
                     </div>
+                    {/* Layout du CV */}
                     <div>
-                      <Label htmlFor="cv-template">Template du CV</Label>
-                      <Select value={cvTemplateValue} onValueChange={(v) => setCvTemplateValue(v)}>
-                        <SelectTrigger id="cv-template"><SelectValue /></SelectTrigger>
+                      <Label htmlFor="cv-layout">Format d'affichage</Label>
+                      <Select value={cvLayoutValue} onValueChange={(v) => setCvLayoutValue(v)}>
+                        <SelectTrigger id="cv-layout"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="modern">Moderne (Emerald cards)</SelectItem>
-                          <SelectItem value="classic">Classique (Colonnes sombres)</SelectItem>
-                          <SelectItem value="minimal">Minimaliste (Épuré)</SelectItem>
+                          <SelectItem value="sidebar">Sidebar (colonne foncée gauche)</SelectItem>
+                          <SelectItem value="centered">Centered (centré, pleine largeur)</SelectItem>
+                          <SelectItem value="split">Split (2 colonnes + bande colorée)</SelectItem>
                         </SelectContent>
                       </Select>
+                    </div>
+
+                    {/* Palette de couleurs prédéfinies */}
+                    <div>
+                      <Label htmlFor="cv-palette">Palette de couleurs</Label>
+                      <Select value={cvTemplateValue} onValueChange={(v) => {
+                        setCvTemplateValue(v);
+                        // Appliquer la palette sélectionnée
+                        const palettes: Record<string, {p:string;a:string}> = {
+                          emerald: { p: '#059669', a: '#065f46' },
+                          ocean: { p: '#0284c7', a: '#0c4a6e' },
+                          sunset: { p: '#ea580c', a: '#9a3412' },
+                          royal: { p: '#7c3aed', a: '#5b21b6' },
+                          mono: { p: '#334155', a: '#0f172a' },
+                        };
+                        const pal = palettes[v] || palettes.emerald;
+                        setCvColorPrimaryValue(pal.p);
+                        setCvColorAccentValue(pal.a);
+                      }}>
+                        <SelectTrigger id="cv-palette"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="emerald">🍃 Emerald (vert HSE)</SelectItem>
+                          <SelectItem value="ocean">🌊 Ocean (bleu)</SelectItem>
+                          <SelectItem value="sunset">🌅 Sunset (orange)</SelectItem>
+                          <SelectItem value="royal">👑 Royal (violet)</SelectItem>
+                          <SelectItem value="mono">⚫ Mono (gris sobre)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Couleurs personnalisées */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="cv-color-primary">Couleur principale</Label>
+                        <div className="flex items-center gap-2 mt-1">
+                          <input
+                            type="color"
+                            id="cv-color-primary"
+                            value={cvColorPrimaryValue}
+                            onChange={(e) => setCvColorPrimaryValue(e.target.value)}
+                            className="h-9 w-12 rounded border border-slate-200 cursor-pointer"
+                          />
+                          <Input
+                            value={cvColorPrimaryValue}
+                            onChange={(e) => setCvColorPrimaryValue(e.target.value)}
+                            className="flex-1 text-xs font-mono"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="cv-color-accent">Couleur accent</Label>
+                        <div className="flex items-center gap-2 mt-1">
+                          <input
+                            type="color"
+                            id="cv-color-accent"
+                            value={cvColorAccentValue}
+                            onChange={(e) => setCvColorAccentValue(e.target.value)}
+                            className="h-9 w-12 rounded border border-slate-200 cursor-pointer"
+                          />
+                          <Input
+                            value={cvColorAccentValue}
+                            onChange={(e) => setCvColorAccentValue(e.target.value)}
+                            className="flex-1 text-xs font-mono"
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
 

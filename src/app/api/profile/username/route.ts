@@ -60,10 +60,18 @@ export async function PATCH(req: NextRequest) {
 
     if (body.profilePublic !== undefined) data.profilePublic = body.profilePublic;
     if (body.cvTemplate !== undefined) {
-      if (!['modern', 'classic', 'minimal'].includes(body.cvTemplate)) {
-        return NextResponse.json({ error: 'Template invalide' }, { status: 400 });
+      if (!['emerald', 'ocean', 'sunset', 'royal', 'mono'].includes(body.cvTemplate)) {
+        return NextResponse.json({ error: 'Palette invalide' }, { status: 400 });
       }
       data.cvTemplate = body.cvTemplate;
+    }
+    if (body.cvColorPrimary !== undefined) data.cvColorPrimary = body.cvColorPrimary;
+    if (body.cvColorAccent !== undefined) data.cvColorAccent = body.cvColorAccent;
+    if (body.cvLayout !== undefined) {
+      if (!['sidebar', 'centered', 'split'].includes(body.cvLayout)) {
+        return NextResponse.json({ error: 'Layout invalide' }, { status: 400 });
+      }
+      data.cvLayout = body.cvLayout;
     }
     if (body.cvTitle !== undefined) data.cvTitle = body.cvTitle?.trim() || null;
     if (body.cvBio !== undefined) data.cvBio = body.cvBio?.trim() || null;

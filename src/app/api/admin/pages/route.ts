@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     if (auth instanceof NextResponse) return auth;
   try {
     const body = await request.json();
-    const { title, slug, content, metaTitle, metaDescription, published, order, showInMenu, parentSlug } = body;
+    const { title, slug, content, metaTitle, metaDescription, primaryKeyword, keywords, excerpt, coverImage, faqJson, published, order, showInMenu, parentSlug } = body;
 
     if (!title) return NextResponse.json({ error: 'Titre requis' }, { status: 400 });
 
@@ -50,6 +50,11 @@ export async function POST(request: NextRequest) {
         content: content || '',
         metaTitle: metaTitle || null,
         metaDescription: metaDescription || null,
+        primaryKeyword: primaryKeyword || null,
+        keywords: keywords || null,
+        excerpt: excerpt || null,
+        coverImage: coverImage || null,
+        faqJson: faqJson || null,
         published: published !== false,
         order: order || 0,
         showInMenu: showInMenu || false,

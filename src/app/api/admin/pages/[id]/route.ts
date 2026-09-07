@@ -22,14 +22,20 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const { id } = await params;
     const body = await request.json();
     const data: Record<string, unknown> = {};
-    if (body.title) data.title = body.title;
+    if (body.title !== undefined) data.title = body.title;
+    if (body.slug !== undefined) data.slug = body.slug;
     if (body.content !== undefined) data.content = body.content;
-    if (body.metaTitle !== undefined) data.metaTitle = body.metaTitle;
-    if (body.metaDescription !== undefined) data.metaDescription = body.metaDescription;
+    if (body.metaTitle !== undefined) data.metaTitle = body.metaTitle || null;
+    if (body.metaDescription !== undefined) data.metaDescription = body.metaDescription || null;
+    if (body.primaryKeyword !== undefined) data.primaryKeyword = body.primaryKeyword || null;
+    if (body.keywords !== undefined) data.keywords = body.keywords || null;
+    if (body.excerpt !== undefined) data.excerpt = body.excerpt || null;
+    if (body.coverImage !== undefined) data.coverImage = body.coverImage || null;
+    if (body.faqJson !== undefined) data.faqJson = body.faqJson || null;
     if (body.published !== undefined) data.published = body.published;
     if (body.order !== undefined) data.order = body.order;
     if (body.showInMenu !== undefined) data.showInMenu = body.showInMenu;
-    if (body.parentSlug !== undefined) data.parentSlug = body.parentSlug;
+    if (body.parentSlug !== undefined) data.parentSlug = body.parentSlug || null;
 
     const page = await db.page.update({ where: { id }, data });
     return NextResponse.json({ page });

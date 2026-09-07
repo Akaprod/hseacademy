@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import {
   LayoutDashboard, FileText, Award, GraduationCap, FolderOpen, File,
-  Menu, MessageSquare, Mail, Users, Star, Shield, ChevronLeft, ChevronRight,
+  Menu, MessageSquare, Mail, Users, Star, Shield, ChevronLeft, ChevronRight, ChevronDown,
   Plus, Pencil, Trash2, Search, Eye, EyeOff, Check, X, Clock,
   TrendingUp, BarChart3, LogOut, ArrowLeft, Lock, CreditCard, FileCheck,
   Settings, Save, Scale, Globe, Wallet,
@@ -183,10 +183,13 @@ function SimpleBarChart({ data, label }: { data: Array<{ month: string; count: n
   );
 }
 
-function SectionHeader({ title, onAdd }: { title: string; onAdd?: () => void }) {
+function SectionHeader({ title, subtitle, onAdd }: { title: string; subtitle?: string; onAdd?: () => void }) {
   return (
-    <div className="flex items-center justify-between mb-4">
-      <h2 className="text-xl font-semibold text-slate-800">{title}</h2>
+    <div className="flex items-start justify-between mb-4 gap-4">
+      <div>
+        <h2 className="text-xl font-semibold text-slate-800">{title}</h2>
+        {subtitle && <p className="text-sm text-slate-500 mt-0.5">{subtitle}</p>}
+      </div>
       {onAdd && (
         <Button onClick={onAdd} size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white">
           <Plus className="h-4 w-4 mr-1" /> Ajouter
@@ -296,8 +299,10 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
   const [pagesPubFilter, setPagesPubFilter] = useState('');
   const [pageModalOpen, setPageModalOpen] = useState(false);
   const [editingPage, setEditingPage] = useState<any>(null);
-  const [pageForm, setPageForm] = useState({ title: '', slug: '', content: '', metaTitle: '', metaDescription: '', published: true, showInMenu: false, order: 0 });
+  const [pageForm, setPageForm] = useState({ title: '', slug: '', content: '', metaTitle: '', metaDescription: '', primaryKeyword: '', keywords: '', excerpt: '', coverImage: '', faqJson: '', published: true, showInMenu: false, order: 0 });
   const [pagesLoading, setPagesLoading] = useState(false);
+  const [expandedPage, setExpandedPage] = useState<string | null>(null);
+  const [seoPreviewPage, setSeoPreviewPage] = useState<any | null>(null);
 
   // Menus
   const [menus, setMenus] = useState<any[]>([]);
@@ -1514,7 +1519,7 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
       }
       setPageModalOpen(false);
       setEditingPage(null);
-      setPageForm({ title: '', slug: '', content: '', metaTitle: '', metaDescription: '', published: true, showInMenu: false, order: 0 });
+      setPageForm({ title: '', slug: '', content: '', metaTitle: '', metaDescription: '', primaryKeyword: '', keywords: '', excerpt: '', coverImage: '', faqJson: '', published: true, showInMenu: false, order: 0 });
       fetchPages();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Erreur');
@@ -1536,7 +1541,7 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
 
   const renderPages = () => (
     <div>
-      <SectionHeader title="Pages" onAdd={() => { setEditingPage(null); setPageForm({ title: '', slug: '', content: '', metaTitle: '', metaDescription: '', published: true, showInMenu: false, order: 0 }); setPageModalOpen(true); }} />
+      <SectionHeader title="Pages" subtitle="Pages SEO de la base de connaissances HSE / QHSE" onAdd={() => { setEditingPage(null); setPageForm({ title: '', slug: '', content: '', metaTitle: '', metaDescription: '', primaryKeyword: '', keywords: '', excerpt: '', coverImage: '', faqJson: '', published: true, showInMenu: false, order: 0 }); setPageModalOpen(true); }} />
 
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="relative flex-1">
@@ -1555,13 +1560,17 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
 
       {pagesLoading ? <LoadingSkeleton /> : (
         <>
-          <div className="text-sm text-slate-500 mb-2">{pagesTotal} page(s)</div>
+          <div className="text-sm text-slate-500 mb-2">{pagesTotal} page(s) · cliquez sur une ligne pour déplier la fiche SEO</div>
           <Card>
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10"></TableHead>
                   <TableHead>Titre</TableHead>
-                  <TableHead className="hidden md:table-cell">Slug</TableHead>
+                  <TableHead className="hidden md:table-cell">URL</TableHead>
+                  <TableHead className="hidden lg:table-cell">Mot-clé principal</TableHead>
+                  <TableHead className="hidden xl:table-cell">Title SEO</TableHead>
+                  <TableHead>SEO</TableHead>
                   <TableHead>Statut</TableHead>
                   <TableHead className="hidden lg:table-cell">Menu</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -1569,23 +1578,94 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
               </TableHeader>
               <TableBody>
                 {pages.length === 0 ? (
-                  <TableRow><TableCell colSpan={5} className="text-center py-8 text-slate-400">Aucune page</TableCell></TableRow>
-                ) : pages.map((p: any) => (
-                  <TableRow key={p.id} className="hover:bg-slate-50">
-                    <TableCell className="font-medium">{p.title}</TableCell>
-                    <TableCell className="hidden md:table-cell text-sm text-slate-500 font-mono">/{p.slug}</TableCell>
-                    <TableCell><StatusBadge status={p.published ? 'published' : 'draft'} /></TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      {p.showInMenu ? <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">Oui</Badge> : <Badge variant="outline" className="bg-slate-50 text-slate-500">Non</Badge>}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingPage(p); setPageForm({ title: p.title, slug: p.slug, content: p.content || '', metaTitle: p.metaTitle || '', metaDescription: p.metaDescription || '', published: p.published, showInMenu: p.showInMenu, order: p.order || 0 }); setPageModalOpen(true); }}><Pencil className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-700" onClick={() => deletePage(p.id)}><Trash2 className="h-4 w-4" /></Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                  <TableRow><TableCell colSpan={9} className="text-center py-8 text-slate-400">Aucune page — créez votre première page SEO</TableCell></TableRow>
+                ) : pages.map((p: any) => {
+                  const seoComplete = !!(p.metaTitle && p.metaDescription && p.primaryKeyword && p.keywords);
+                  const seoPartial = !seoComplete && !!(p.metaTitle || p.metaDescription || p.primaryKeyword || p.keywords);
+                  const isExpanded = expandedPage === p.id;
+                  return (
+                    <React.Fragment key={p.id}>
+                      <TableRow className="hover:bg-slate-50 cursor-pointer" onClick={() => setExpandedPage(isExpanded ? null : p.id)}>
+                        <TableCell className="text-slate-400">
+                          {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        </TableCell>
+                        <TableCell className="font-medium">{p.title}</TableCell>
+                        <TableCell className="hidden md:table-cell text-sm text-slate-500 font-mono">/pages/{p.slug}</TableCell>
+                        <TableCell className="hidden lg:table-cell text-sm">
+                          {p.primaryKeyword ? <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">{p.primaryKeyword}</Badge> : <span className="text-slate-400">—</span>}
+                        </TableCell>
+                        <TableCell className="hidden xl:table-cell text-sm text-slate-600 max-w-xs truncate" title={p.metaTitle || ''}>{p.metaTitle || <span className="text-slate-400">—</span>}</TableCell>
+                        <TableCell>
+                          {seoComplete ? <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">Complet</Badge>
+                           : seoPartial ? <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">Partiel</Badge>
+                           : <Badge variant="outline" className="bg-slate-50 text-slate-500">Vide</Badge>}
+                        </TableCell>
+                        <TableCell><StatusBadge status={p.published ? 'published' : 'draft'} /></TableCell>
+                        <TableCell className="hidden lg:table-cell">
+                          {p.showInMenu ? <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">Oui</Badge> : <Badge variant="outline" className="bg-slate-50 text-slate-500">Non</Badge>}
+                        </TableCell>
+                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-1">
+                            <Button variant="ghost" size="icon" className="h-8 w-8" title="Aperçu SEO" onClick={() => setSeoPreviewPage(p)}><Eye className="h-4 w-4" /></Button>
+                            <a href={`/pages/${p.slug}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-slate-100" title="Voir sur le site"><Globe className="h-4 w-4" /></a>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingPage(p); setPageForm({ title: p.title, slug: p.slug, content: p.content || '', metaTitle: p.metaTitle || '', metaDescription: p.metaDescription || '', primaryKeyword: p.primaryKeyword || '', keywords: p.keywords || '', excerpt: p.excerpt || '', coverImage: p.coverImage || '', faqJson: p.faqJson || '', published: p.published, showInMenu: p.showInMenu, order: p.order || 0 }); setPageModalOpen(true); }}><Pencil className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-700" onClick={() => deletePage(p.id)}><Trash2 className="h-4 w-4" /></Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                      {isExpanded && (
+                        <TableRow className="bg-slate-50/60">
+                          <TableCell colSpan={9} className="p-4">
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 text-sm">
+                              <div className="space-y-3">
+                                <div>
+                                  <div className="text-xs font-semibold uppercase text-slate-400 mb-1">URL publique</div>
+                                  <code className="text-xs text-emerald-700 bg-emerald-50 px-2 py-1 rounded">/pages/{p.slug}</code>
+                                </div>
+                                <div>
+                                  <div className="text-xs font-semibold uppercase text-slate-400 mb-1">Mot-clé principal</div>
+                                  <div className="text-slate-700">{p.primaryKeyword || <span className="text-slate-400">Non défini</span>}</div>
+                                </div>
+                                <div>
+                                  <div className="text-xs font-semibold uppercase text-slate-400 mb-1">Mots-clés secondaires</div>
+                                  <div className="flex flex-wrap gap-1">
+                                    {(p.keywords || '').split(',').map((k: string) => k.trim()).filter(Boolean).length === 0
+                                      ? <span className="text-slate-400">Non définis</span>
+                                      : (p.keywords || '').split(',').map((k: string, i: number) => (
+                                        <Badge key={i} variant="outline" className="bg-white text-slate-600 border-slate-200">{k.trim()}</Badge>
+                                      ))}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="text-xs font-semibold uppercase text-slate-400 mb-1">Extrait (résumé)</div>
+                                  <div className="text-slate-600">{p.excerpt || <span className="text-slate-400">Non défini</span>}</div>
+                                </div>
+                              </div>
+                              <div className="space-y-3">
+                                <div>
+                                  <div className="text-xs font-semibold uppercase text-slate-400 mb-1">Title SEO (balise &lt;title&gt;)</div>
+                                  <div className="text-slate-800 font-medium">{p.metaTitle || <span className="text-slate-400">Non défini</span>}</div>
+                                </div>
+                                <div>
+                                  <div className="text-xs font-semibold uppercase text-slate-400 mb-1">Meta description</div>
+                                  <div className="text-slate-600">{p.metaDescription || <span className="text-slate-400">Non définie</span>}</div>
+                                </div>
+                                <div>
+                                  <div className="text-xs font-semibold uppercase text-slate-400 mb-1">Aperçu Google (SERP)</div>
+                                  <div className="bg-white border border-slate-200 rounded p-3">
+                                    <div className="text-xs text-emerald-700 truncate">https://iicp.ma/pages/{p.slug}</div>
+                                    <div className="text-base text-blue-700 font-medium leading-tight mt-0.5 line-clamp-1">{p.metaTitle || p.title}</div>
+                                    <div className="text-sm text-slate-600 line-clamp-2 mt-0.5">{p.metaDescription || p.excerpt || '—'}</div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </TableBody>
             </Table>
           </Card>
@@ -1594,33 +1674,72 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
       )}
 
       <Dialog open={pageModalOpen} onOpenChange={setPageModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingPage ? 'Modifier la page' : 'Nouvelle page'}</DialogTitle>
+            <DialogTitle>{editingPage ? 'Modifier la page' : 'Nouvelle page SEO'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Titre *</Label>
                 <Input value={pageForm.title} onChange={(e) => setPageForm({ ...pageForm, title: e.target.value })} />
+                <p className="text-xs text-slate-500 mt-1">Titre interne affiché dans la liste admin.</p>
               </div>
               <div>
-                <Label>Slug</Label>
-                <Input value={pageForm.slug} onChange={(e) => setPageForm({ ...pageForm, slug: e.target.value })} placeholder="auto-généré" />
+                <Label>Slug (URL)</Label>
+                <Input value={pageForm.slug} onChange={(e) => setPageForm({ ...pageForm, slug: e.target.value })} placeholder="auto-généré à partir du titre" />
+                <p className="text-xs text-slate-500 mt-1">URL publique : /pages/<span className="font-mono">{pageForm.slug || '…'}</span></p>
               </div>
             </div>
-            <div>
+
+            <div className="border-t pt-3">
+              <div className="text-xs font-semibold uppercase text-emerald-700 mb-2">Référencement (SEO)</div>
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label>Mot-clé principal</Label>
+                    <Input value={pageForm.primaryKeyword} onChange={(e) => setPageForm({ ...pageForm, primaryKeyword: e.target.value })} placeholder="ex : travail en hauteur" />
+                    <p className="text-xs text-slate-500 mt-1">L'intention de recherche principale ciblée par la page.</p>
+                  </div>
+                  <div>
+                    <Label>Mots-clés secondaires</Label>
+                    <Input value={pageForm.keywords} onChange={(e) => setPageForm({ ...pageForm, keywords: e.target.value })} placeholder="ex : prévention, échafaudage, harnais" />
+                    <p className="text-xs text-slate-500 mt-1">Séparés par des virgules.</p>
+                  </div>
+                </div>
+                <div>
+                  <Label>Title SEO (balise &lt;title&gt;)</Label>
+                  <Input value={pageForm.metaTitle} onChange={(e) => setPageForm({ ...pageForm, metaTitle: e.target.value })} placeholder="55–60 caractères max" maxLength={70} />
+                  <p className="text-xs text-slate-500 mt-1">{(pageForm.metaTitle || '').length} caractères — Google affiche environ 60 caractères.</p>
+                </div>
+                <div>
+                  <Label>Meta description</Label>
+                  <Textarea value={pageForm.metaDescription} onChange={(e) => setPageForm({ ...pageForm, metaDescription: e.target.value })} rows={2} placeholder="150–160 caractères max" maxLength={180} />
+                  <p className="text-xs text-slate-500 mt-1">{(pageForm.metaDescription || '').length} caractères — Google affiche environ 160 caractères.</p>
+                </div>
+                <div>
+                  <Label>Extrait (résumé court)</Label>
+                  <Textarea value={pageForm.excerpt} onChange={(e) => setPageForm({ ...pageForm, excerpt: e.target.value })} rows={2} placeholder="Résumé affiché dans la liste des pages et en Open Graph si pas de meta description." />
+                </div>
+                <div>
+                  <Label>Image de couverture (URL)</Label>
+                  <Input value={pageForm.coverImage} onChange={(e) => setPageForm({ ...pageForm, coverImage: e.target.value })} placeholder="https://… (image illustrative liée au sujet)" />
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t pt-3">
               <Label>Contenu (Markdown)</Label>
-              <Textarea value={pageForm.content} onChange={(e) => setPageForm({ ...pageForm, content: e.target.value })} rows={12} className="font-mono text-sm" />
+              <Textarea value={pageForm.content} onChange={(e) => setPageForm({ ...pageForm, content: e.target.value })} rows={12} className="font-mono text-sm" placeholder="Un seul H1, puis des H2/H3 pour structurer la page. Liens internes en markdown : [texte](/pages/slug)" />
+              <p className="text-xs text-slate-500 mt-1">Structure recommandée : 1 H1, plusieurs H2 (Définition, Enjeux, Prévention, Réglementation, FAQ), liens internes vers d'autres pages SEO.</p>
             </div>
-            <div>
-              <Label>Meta titre</Label>
-              <Input value={pageForm.metaTitle} onChange={(e) => setPageForm({ ...pageForm, metaTitle: e.target.value })} />
+
+            <div className="border-t pt-3">
+              <Label>FAQ (JSON) — optionnel</Label>
+              <Textarea value={pageForm.faqJson} onChange={(e) => setPageForm({ ...pageForm, faqJson: e.target.value })} rows={4} className="font-mono text-sm" placeholder='[{"q":"Question ?","a":"Réponse courte et fiable."}]' />
+              <p className="text-xs text-slate-500 mt-1">Format JSON : tableau de <code>{'{q:"…", a:"…"}'}</code>. Permet le schema.org FAQPage (rich snippets).</p>
             </div>
-            <div>
-              <Label>Meta description</Label>
-              <Textarea value={pageForm.metaDescription} onChange={(e) => setPageForm({ ...pageForm, metaDescription: e.target.value })} rows={2} />
-            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Ordre</Label>
@@ -1643,6 +1762,66 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
             <Button onClick={handlePageSubmit} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700 text-white">
               {saving ? 'Enregistrement...' : editingPage ? 'Mettre à jour' : 'Créer'}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!seoPreviewPage} onOpenChange={(o) => !o && setSeoPreviewPage(null)}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Aperçu SEO — {seoPreviewPage?.title}</DialogTitle>
+          </DialogHeader>
+          {seoPreviewPage && (
+            <div className="space-y-4 text-sm">
+              <div>
+                <div className="text-xs font-semibold uppercase text-slate-400 mb-1">Aperçu Google (SERP)</div>
+                <div className="bg-white border border-slate-200 rounded p-3">
+                  <div className="text-xs text-emerald-700 truncate">https://iicp.ma/pages/{seoPreviewPage.slug}</div>
+                  <div className="text-base text-blue-700 font-medium leading-tight mt-0.5">{seoPreviewPage.metaTitle || seoPreviewPage.title}</div>
+                  <div className="text-sm text-slate-600 mt-0.5">{seoPreviewPage.metaDescription || seoPreviewPage.excerpt || '—'}</div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <div className="text-xs font-semibold uppercase text-slate-400">URL publique</div>
+                  <code className="text-xs text-emerald-700 bg-emerald-50 px-2 py-1 rounded">/pages/{seoPreviewPage.slug}</code>
+                </div>
+                <div>
+                  <div className="text-xs font-semibold uppercase text-slate-400">Mot-clé principal</div>
+                  <div>{seoPreviewPage.primaryKeyword || <span className="text-slate-400">—</span>}</div>
+                </div>
+              </div>
+              <div>
+                <div className="text-xs font-semibold uppercase text-slate-400 mb-1">Mots-clés secondaires</div>
+                <div className="flex flex-wrap gap-1">
+                  {(seoPreviewPage.keywords || '').split(',').map((k: string) => k.trim()).filter(Boolean).length === 0
+                    ? <span className="text-slate-400">—</span>
+                    : (seoPreviewPage.keywords || '').split(',').map((k: string, i: number) => (
+                      <Badge key={i} variant="outline" className="bg-white text-slate-600 border-slate-200">{k.trim()}</Badge>
+                    ))}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs font-semibold uppercase text-slate-400 mb-1">Title SEO</div>
+                <div className="text-slate-800 font-medium">{seoPreviewPage.metaTitle || <span className="text-slate-400">—</span>}</div>
+                <p className="text-xs text-slate-500 mt-0.5">{(seoPreviewPage.metaTitle || '').length} caractères</p>
+              </div>
+              <div>
+                <div className="text-xs font-semibold uppercase text-slate-400 mb-1">Meta description</div>
+                <div className="text-slate-600">{seoPreviewPage.metaDescription || <span className="text-slate-400">—</span>}</div>
+                <p className="text-xs text-slate-500 mt-0.5">{(seoPreviewPage.metaDescription || '').length} caractères</p>
+              </div>
+              <div>
+                <div className="text-xs font-semibold uppercase text-slate-400 mb-1">Extrait</div>
+                <div className="text-slate-600">{seoPreviewPage.excerpt || <span className="text-slate-400">—</span>}</div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSeoPreviewPage(null)}>Fermer</Button>
+            <a href={`/pages/${seoPreviewPage?.slug}`} target="_blank" rel="noopener noreferrer">
+              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">Voir sur le site</Button>
+            </a>
           </DialogFooter>
         </DialogContent>
       </Dialog>

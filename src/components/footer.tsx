@@ -198,6 +198,9 @@ export default function Footer({ onNavigate }: FooterProps) {
           </p>
           {/* Liens pages légales — routes App Router autonomes (pas via onNavigate) */}
           <nav className="flex items-center gap-4 text-xs">
+            <a href="/pages" className="text-slate-500 hover:text-emerald-400 transition-colors">
+              Base de connaissances
+            </a>
             <a href="/refund" className="text-slate-500 hover:text-emerald-400 transition-colors">
               Remboursement
             </a>

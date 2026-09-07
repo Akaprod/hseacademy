@@ -28,6 +28,7 @@ model User {
   coursePayments    CoursePayment[]
   attestationPayments AttestationPayment[]
   wallet            Wallet?
+  paymentRequests   PaymentRequest[]
 }
 
 model Category {
@@ -573,4 +574,56 @@ model PaymentSettings {
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+// ============================================================================
+// PAYMENT REQUEST — Demande de paiement côté client (anti-spam)
+// ============================================================================
+//
+// Système de demande de paiement pour éviter le spam de rechargements wallet.
+// Règles métier :
+//   - Max 10 demandes en cours par utilisateur (boutons désactivés au-delà)
+//   - Chaque demande expire après 72 heures (statut "expired")
+//   - L'utilisateur peut supprimer ses anciennes demandes
+//   - L'utilisateur peut soumettre une preuve (image ou texte)
+//   - Seules les demandes avec preuve soumise sont vues par l'admin
+//   - L'admin valide/refuse uniquement les demandes avec preuve
+//
+// Statuts :
+//   pending   — demande créée, en attente de preuve
+//   submitted — preuve soumise, en attente de validation admin
+//   validated — validé par admin (solde crédité pour wallet_charge)
+//   rejected  — refusé par admin
+//   expired   — demande expirée (72h dépassées)
+//   cancelled — annulé par l'utilisateur
+//
+// Types :
+//   wallet_charge  — rechargement wallet
+//   course_payment — paiement de cours
+//   print_payment  — attestation imprimée
+// ============================================================================
+
+model PaymentRequest {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reqType         String   @default("wallet_charge")
+  amount          Float
+  method          String
+  reqStatus       String   @default("pending")
+  description     String   @default("")
+  expiresAt       DateTime
+  proofPath       String?
+  proofOriginalName String?
+  proofMimeType   String?
+  proofSize       Int?
+  submittedAt     DateTime?
+  validatedAt     DateTime?
+  validatedBy     String?
+  rejectionReason String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  @@index([userId])
+  @@index([reqStatus])
+  @@index([reqType])
 }

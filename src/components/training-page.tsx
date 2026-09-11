@@ -12,10 +12,14 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
   BookOpen, Play, CheckCircle, Clock, Users, Award, ArrowLeft, ArrowRight,
   Trophy, XCircle, ChevronRight, GraduationCap, Star, FileCheck, Lock,
-  CircleCheck, AlertCircle, Menu, X, Sparkles, ExternalLink, CreditCard
+  CircleCheck, AlertCircle, Menu, X, Sparkles, ExternalLink, CreditCard,
+  Wallet, Printer, Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PaymentModal, PaymentStatusBadge } from '@/components/payment-components';
@@ -97,6 +101,16 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
   const [attestations, setAttestations] = useState<Attestation[]>([]);
   const [currentAttestation, setCurrentAttestation] = useState<Attestation | null>(null);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+
+  /* wallet + charge modal */
+  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [walletLoading, setWalletLoading] = useState(false);
+  const [chargeModalOpen, setChargeModalOpen] = useState(false);
+  const [chargeAmount, setChargeAmount] = useState('120');
+  const [chargeMethod, setChargeMethod] = useState('paypal');
+  const [charging, setCharging] = useState(false);
+  const [confirmWalletPay, setConfirmWalletPay] = useState(false);
+  const [paying, setPaying] = useState(false);
 
   /* progress tracking (in-memory from enrollment) */
   const [completedChapters, setCompletedChapters] = useState<Set<string>>(new Set());
@@ -209,13 +223,29 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
       toast.error('Ce cours n\'a pas encore de contenu disponible');
       return;
     }
+    // Déterminer le chapitre de reprise :
+    // - enrollment.currentChapter est 1-based (default 1, premier chapitre)
+    // - Si l'utilisateur a déjà progressé (currentChapter > 1), on reprend
+    //   au chapitre correspondant (ou le dernier chapitre si currentChapter > total)
+    // - Sinon, on commence au chapitre 1 (index 0)
+    let resumeIdx = 0;
+    if (selectedCourse.enrollment && selectedCourse.enrollment.currentChapter > 1) {
+      const saved = selectedCourse.enrollment.currentChapter - 1; // convertir en 0-based
+      resumeIdx = Math.min(saved, selectedCourse.chapters.length - 1);
+    }
+
     try {
-      const res = await fetch(`/api/courses/${selectedCourse.id}/chapters/${selectedCourse.chapters[0].id}?userId=${user?.id || ''}`);
+      const res = await fetch(`/api/courses/${selectedCourse.id}/chapters/${selectedCourse.chapters[resumeIdx].id}?userId=${user?.id || ''}`);
       if (res.ok) {
         const ch = await res.json();
-        setChapters([ch]);
-        setCurrentChapterIdx(0);
+        // Pré-remplir le tableau chapters avec des placeholders jusqu'à resumeIdx
+        const placeholderChapters = new Array(selectedCourse.chapters.length).fill(null);
+        placeholderChapters[resumeIdx] = ch;
+        setChapters(placeholderChapters);
+        setCurrentChapterIdx(resumeIdx);
         setView('learn');
+        // Remonter en haut de page au démarrage/reprise du cours
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
         toast.error('Erreur de chargement du chapitre');
       }
@@ -235,6 +265,8 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
         });
         setCurrentChapterIdx(index);
         setSidebarOpen(false);
+        // Remonter en haut de page après le chargement du chapitre
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     } catch { toast.error('Erreur de chargement'); }
   };
@@ -297,6 +329,96 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
       const res = await fetch(`/api/courses/attestations?userId=${user.id}`);
       if (res.ok) setAttestations(await res.json());
     } catch { /* ignore */ }
+  };
+
+  // ---- Fetch wallet balance ----
+  const fetchWallet = useCallback(async () => {
+    if (!user) return;
+    try {
+      const res = await fetch('/api/wallet', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        setWalletBalance(typeof data.balance === 'number' ? data.balance : 0);
+      }
+    } catch { /* ignore */ }
+  }, [user]);
+
+  useEffect(() => {
+    fetchWallet();
+  }, [fetchWallet]);
+
+  // ---- Pay via wallet (déduction atomique côté serveur) ----
+  const payViaWallet = async () => {
+    if (!user || !selectedCourse?.enrollment) return;
+    setPaying(true);
+    try {
+      const res = await fetch('/api/courses/payments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enrollmentId: selectedCourse.enrollment.id,
+          method: 'wallet',
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.walletBalance !== undefined) {
+          setWalletBalance(data.walletBalance);
+        }
+        setConfirmWalletPay(false);
+        toast.success('Paiement réussi ! 120 MAD déduits de votre wallet.');
+
+        // Mettre à jour selectedCourse IMMÉDIATEMENT (sans attendre fetchCourses)
+        // pour que l'UI change : "Payer" → "Obtenir mon attestation"
+        setSelectedCourse({
+          ...selectedCourse,
+          enrollment: {
+            ...selectedCourse.enrollment,
+            paymentStatus: 'validated',
+          },
+        });
+
+        // Re-fetch la liste des cours en arrière-plan (pour la cohérence du catalogue)
+        fetchCourses();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || 'Échec du paiement');
+      }
+    } catch {
+      toast.error('Erreur réseau');
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  // ---- Charge wallet (rechargement via PaymentRequest) ----
+  const submitCharge = async () => {
+    if (!user) return;
+    const num = parseFloat(chargeAmount);
+    if (!num || num < 120) {
+      toast.error('Le montant minimum est de 120 MAD');
+      return;
+    }
+    setCharging(true);
+    try {
+      const res = await fetch('/api/wallet/charge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: num, method: chargeMethod }),
+      });
+      if (res.ok) {
+        toast.success('Demande de rechargement envoyée. Elle sera traitée par l\'administration.');
+        setChargeModalOpen(false);
+        setChargeAmount('120');
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || 'Erreur lors de la demande');
+      }
+    } catch {
+      toast.error('Erreur réseau');
+    } finally {
+      setCharging(false);
+    }
   };
 
   const levelLabel = (l: string) => {
@@ -468,7 +590,14 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
                     const done = completedChapters.has(ch.id);
                     const score = chapterScores[ch.id];
                     return (
-                      <div key={ch.id} className={`flex items-center gap-3 p-3 rounded-lg ${done ? 'bg-emerald-50 border border-emerald-200' : 'bg-white border border-slate-200'} hover:shadow-sm transition`}
+                      <div key={ch.id}
+                        className={`flex items-center gap-3 p-3 rounded-lg ${done ? 'bg-emerald-50 border border-emerald-200' : 'bg-white border border-slate-200'} hover:shadow-sm transition cursor-pointer`}
+                        onClick={() => {
+                          if (enrolled) {
+                            loadChapter(ch.id, idx);
+                            setView('learn');
+                          }
+                        }}
                       >
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${done ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
                           {done ? <CheckCircle className="h-5 w-5" /> : idx + 1}
@@ -528,20 +657,53 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
                         </div>
                       )}
                       {allPassed ? (
-                        selectedCourse.enrollment?.paymentStatus === 'validated' || selectedCourse.enrollment?.paymentStatus === 'not_required' ? (
-                          <Button className="w-full" size="lg" variant="outline" onClick={requestAttestation}>
-                            <Award className="h-4 w-4 mr-2" /> Obtenir mon attestation
+                        <div className="space-y-3">
+                          {/* Bouton pour revoir les chapitres même après cours terminé */}
+                          <Button className="w-full" size="lg" variant="outline" onClick={startLearning}>
+                            <BookOpen className="h-4 w-4 mr-2" /> Revoir les chapitres
                           </Button>
-                        ) : (
-                          <div className="space-y-2">
-                            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 text-center">
-                              Votre cours est terminé. L'attestation sera disponible après validation du paiement.
+
+                          {selectedCourse.enrollment?.paymentStatus === 'validated' || selectedCourse.enrollment?.paymentStatus === 'not_required' ? (
+                            <div className="space-y-3">
+                              <Button className="w-full" size="lg" onClick={requestAttestation}>
+                                <Award className="h-4 w-4 mr-2" /> Obtenir mon attestation
+                              </Button>
+                              {/* Bouton attestation imprimée — désactivé (sera activé plus tard) */}
+                              <Button className="w-full" size="lg" variant="outline" disabled>
+                                <Printer className="h-4 w-4 mr-2" /> Demander une attestation imprimée
+                              </Button>
                             </div>
-                            <Button className="w-full" size="lg" onClick={() => setPaymentModalOpen(true)}>
-                              <CreditCard className="h-4 w-4 mr-2" /> Payer 120 MAD
-                            </Button>
-                          </div>
-                        )
+                          ) : walletBalance >= 120 ? (
+                            /* WALLET SUFFISANT → bouton "Payer via Wallet" */
+                            <div className="space-y-2">
+                              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-800 text-center">
+                                Solde wallet : {walletBalance.toFixed(0)} MAD
+                              </div>
+                              <Button className="w-full" size="lg" onClick={() => setConfirmWalletPay(true)} disabled={paying}>
+                                {paying ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Wallet className="h-4 w-4 mr-2" />}
+                                {paying ? 'Paiement en cours...' : 'Payer 120 MAD via Wallet'}
+                              </Button>
+                              {/* Option : payer par virement/PayPal (dirigé vers wallet) */}
+                              <Button className="w-full" size="lg" variant="outline" onClick={() => setPaymentModalOpen(true)}>
+                                <CreditCard className="h-4 w-4 mr-2" /> Autre moyen de paiement
+                              </Button>
+                            </div>
+                          ) : (
+                            /* WALLET INSUFFISANT → message + bouton recharger */
+                            <div className="space-y-2">
+                              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 text-center">
+                                Solde insuffisant. Votre solde est de {walletBalance.toFixed(0)} MAD, le cours coûte 120 MAD.
+                              </div>
+                              <Button className="w-full" size="lg" onClick={() => setChargeModalOpen(true)}>
+                                <Wallet className="h-4 w-4 mr-2" /> Recharger mon Wallet
+                              </Button>
+                              {/* Option : payer par virement/PayPal (dirigé vers wallet) */}
+                              <Button className="w-full" size="lg" variant="outline" onClick={() => setPaymentModalOpen(true)}>
+                                <CreditCard className="h-4 w-4 mr-2" /> Autre moyen de paiement
+                              </Button>
+                            </div>
+                          )}
+                        </div>
                       ) : (
                         <Button className="w-full" size="lg" onClick={startLearning}>
                           <Play className="h-4 w-4 mr-2" />
@@ -555,6 +717,107 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
             </div>
           </div>
         </div>
+
+        {/* ===== Modals (Dialog uses portals, so they render on top) ===== */}
+        {/* PaymentModal (bank_transfer / paypal) */}
+        {paymentModalOpen && selectedCourse?.enrollment && (
+          <PaymentModal
+            open={paymentModalOpen}
+            onOpenChange={setPaymentModalOpen}
+            enrollmentId={selectedCourse.enrollment.id}
+            courseTitle={selectedCourse.title}
+            amount={120}
+            onSuccess={() => { fetchCourses(); fetchWallet(); }}
+          />
+        )}
+
+        {/* Dialog : Confirmation paiement via Wallet */}
+        <Dialog open={confirmWalletPay} onOpenChange={setConfirmWalletPay}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Wallet className="h-5 w-5 text-emerald-600" /> Paiement via Wallet
+              </DialogTitle>
+              <DialogDescription>
+                Confirmer la déduction de 120 MAD de votre wallet pour payer cette attestation.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-600">Solde actuel</span>
+                <span className="font-medium">{walletBalance.toFixed(2)} MAD</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-600">Montant à déduire</span>
+                <span className="font-medium text-red-600">- 120.00 MAD</span>
+              </div>
+              <Separator />
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-600">Solde après paiement</span>
+                <span className="font-bold text-emerald-700">{(walletBalance - 120).toFixed(2)} MAD</span>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <Button variant="outline" onClick={() => setConfirmWalletPay(false)}>Annuler</Button>
+              <Button onClick={payViaWallet} disabled={paying} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                {paying ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Paiement...</> : 'Confirmer le paiement'}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog : Rechargement du Wallet */}
+        <Dialog open={chargeModalOpen} onOpenChange={setChargeModalOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Wallet className="h-5 w-5 text-emerald-600" /> Recharger mon Wallet
+              </DialogTitle>
+              <DialogDescription>
+                Rechargez votre wallet pour payer le cours (120 MAD). La demande sera validée par l'administration.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="charge-amount-training">Montant (MAD)</Label>
+                <Input
+                  id="charge-amount-training"
+                  type="number"
+                  min="120"
+                  value={chargeAmount}
+                  onChange={(e) => setChargeAmount(e.target.value)}
+                  placeholder="120"
+                />
+                {chargeAmount && parseFloat(chargeAmount) >= 1000 && (
+                  <p className="text-sm text-emerald-700 font-medium mt-1">Bonus : +{((parseFloat(chargeAmount) || 0) * 0.10).toFixed(2)} MAD (10%)</p>
+                )}
+                {chargeAmount && parseFloat(chargeAmount) >= 500 && parseFloat(chargeAmount) < 1000 && (
+                  <p className="text-sm text-emerald-700 font-medium mt-1">Bonus : +{((parseFloat(chargeAmount) || 0) * 0.05).toFixed(2)} MAD (5%)</p>
+                )}
+              </div>
+              <div>
+                <Label>Moyen de paiement</Label>
+                <Select value={chargeMethod} onValueChange={setChargeMethod}>
+                  <SelectTrigger className="w-full mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="paypal">PayPal</SelectItem>
+                    <SelectItem value="bank_transfer">Virement bancaire</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-md p-2">
+                Après validation de votre rechargement par l'administration, le montant sera crédité à votre wallet
+                et le paiement du cours sera effectué automatiquement si le solde est suffisant.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <Button variant="outline" onClick={() => setChargeModalOpen(false)}>Annuler</Button>
+              <Button onClick={submitCharge} disabled={charging} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                {charging ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Envoi...</> : 'Envoyer la demande'}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
@@ -965,18 +1228,7 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
 
   /* ================================================================ */
   /*  MY ATTESTATIONS VIEW                                             */
-  /* ================================================================ */
-  // Payment modal render
-  const paymentModal = paymentModalOpen && selectedCourse?.enrollment ? (
-    <PaymentModal
-      open={paymentModalOpen}
-      onOpenChange={setPaymentModalOpen}
-      enrollmentId={selectedCourse.enrollment.id}
-      courseTitle={selectedCourse.title}
-      amount={120}
-      onSuccess={() => { fetchCourses(); }}
-    />
-  ) : null;
+  /* (PaymentModal is now rendered inside the detail view with modals) */
 
   if (view === 'myAttestations') {
     return (
@@ -1039,7 +1291,14 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
     );
   }
 
-  return null;
+  // Modal : chargement de cours mais pas de contenu
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-10 w-10 text-emerald-600 animate-spin" />
+      </div>
+    );
+  }
 
-  {paymentModal}
+  return null;
 }

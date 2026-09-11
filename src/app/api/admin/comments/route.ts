@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
       db.comment.count({ where }),
     ]);
 
-    return NextResponse.json({ comments, total, page, limit, pages: Math.ceil(total / limit) });
+    return NextResponse.json({ comments, total, page, limit, totalPages: Math.ceil(total / limit) });
   } catch {
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
   }

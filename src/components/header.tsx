@@ -16,7 +16,7 @@
 //   - Navigation clavier (Radix)
 // ============================================================================
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 import {
@@ -30,14 +30,14 @@ import {
 import { toast } from 'sonner';
 import {
   GraduationCap, Menu, Phone, Mail, Shield, BookOpen, Award, FileCheck,
-  ChevronDown, Settings, User, FileText, Lock, LogOut,
+  ChevronDown, Settings, User, FileText, Lock, LogOut, Wallet, Inbox,
 } from 'lucide-react';
 
 interface HeaderProps {
   currentPage: string;
   onNavigate: (page: string, data?: Record<string, string>) => void;
   onAuthOpen: (mode: 'login' | 'register') => void;
-  user: { id: string; name: string; email: string; role: string } | null;
+  user: { id: string; name: string; email: string; role: string; avatar?: string | null; profile?: { avatar?: string | null; fullName?: string | null } | null } | null;
   onLogout: () => void;
 }
 
@@ -45,10 +45,11 @@ const navLinks = [
   { label: 'Accueil', page: 'home' },
   { label: 'Formations', page: 'formations',
     children: [
+      { label: 'Diplôme Qualifié QHSE', page: 'formations', data: { slug: 'diplome-qualifie-qhse' } },
       { label: 'Technicien QHSE', page: 'formations', data: { slug: 'technicien-qhse' } },
       { label: 'Technicien Supérieur QHSE', page: 'formations', data: { slug: 'technicien-superieur-qhse' } },
       { label: 'Licence Professionnelle QHSE', page: 'formations', data: { slug: 'licence-professionnelle-qhse' } },
-      { label: 'Master Professionnel QHSE', page: 'formations', data: { slug: 'master-professionnelle-qhse' } },
+      { label: 'Master Professionnel QHSE', page: 'formations', data: { slug: 'master-professionnel-qhse' } },
       { label: 'VAE Expertise QHSE', page: 'formations', data: { slug: 'vae-expertise-qhse' } },
     ]
   },
@@ -62,6 +63,41 @@ const navLinks = [
 export default function Header({ currentPage, onNavigate, onAuthOpen, user, onLogout }: HeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  // Wallet balance + active requests count — affichés dans le menu compte
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [activeRequestsCount, setActiveRequestsCount] = useState<number>(0);
+
+  // Fetch wallet + active requests quand l'utilisateur est connecté
+  // (léger, ne s'exécute que si user présent — 2 requêtes parallèles)
+  const fetchUserData = useCallback(async () => {
+    if (!user) {
+      setWalletBalance(null);
+      setActiveRequestsCount(0);
+      return;
+    }
+    try {
+      const [walletRes, prRes] = await Promise.all([
+        fetch('/api/wallet', { cache: 'no-store' }),
+        fetch('/api/payment-requests', { cache: 'no-store' }),
+      ]);
+      if (walletRes.ok) {
+        const data = await walletRes.json();
+        setWalletBalance(typeof data.balance === 'number' ? data.balance : 0);
+      }
+      if (prRes.ok) {
+        const data = await prRes.json();
+        setActiveRequestsCount(typeof data.activeCount === 'number' ? data.activeCount : 0);
+      }
+    } catch {
+      // Silencieux — on ne veut pas casser le header si une API échoue
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchUserData();
+    // Re-fetch quand on revient sur une page (le solde peut avoir changé)
+    // Pas de polling — juste au changement de page et au mount
+  }, [fetchUserData, currentPage]);
 
   const handleNav = (page: string, data?: Record<string, string>) => {
     onNavigate(page, data);
@@ -86,6 +122,8 @@ export default function Header({ currentPage, onNavigate, onAuthOpen, user, onLo
 
   const isAdmin = user?.role === 'admin';
   const avatarLetter = user?.name?.charAt(0).toUpperCase() || '?';
+  // Avatar : priorité à profile.avatar (UserProfile), puis user.avatar (User), sinon lettre
+  const userAvatar = user?.profile?.avatar || user?.avatar || null;
 
   return (
     <header className="sticky top-0 z-50 w-full bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
@@ -131,7 +169,7 @@ export default function Header({ currentPage, onNavigate, onAuthOpen, user, onLo
               link.children ? (
                 <div key={link.page} className="relative group">
                   <button
-                    className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
                       currentPage === link.page ? 'text-emerald-700 bg-emerald-50' : 'text-slate-700 hover:text-emerald-700 hover:bg-slate-50'
                     }`}
                     onClick={() => handleNav(link.page)}
@@ -158,7 +196,7 @@ export default function Header({ currentPage, onNavigate, onAuthOpen, user, onLo
                 <button
                   key={link.page}
                   onClick={() => handleNav(link.page)}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
                     currentPage === link.page ? 'text-emerald-700 bg-emerald-50' : 'text-slate-700 hover:text-emerald-700 hover:bg-slate-50'
                   }`}
                 >
@@ -180,8 +218,8 @@ export default function Header({ currentPage, onNavigate, onAuthOpen, user, onLo
                     className="hidden md:flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1"
                     aria-label="Menu du compte"
                   >
-                    <div className="h-7 w-7 rounded-full bg-emerald-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
-                      {avatarLetter}
+                    <div className="h-7 w-7 rounded-full bg-emerald-600 flex items-center justify-center text-white text-xs font-bold shrink-0 overflow-hidden">
+                      {userAvatar ? <img src={userAvatar} alt={user.name} className="h-full w-full object-cover" /> : avatarLetter}
                     </div>
                     <span className="text-sm font-medium text-slate-700 max-w-[120px] truncate hidden sm:inline">
                       {user.name}
@@ -212,10 +250,28 @@ export default function Header({ currentPage, onNavigate, onAuthOpen, user, onLo
                     <Award className="mr-2 h-4 w-4 text-slate-500" />
                     <span>Mes attestations</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem disabled className="opacity-60 cursor-not-allowed">
-                    <FileText className="mr-2 h-4 w-4 text-slate-400" />
+                  <DropdownMenuItem onClick={() => handleNav('profile', { tab: 'cv' })} className="cursor-pointer">
+                    <FileText className="mr-2 h-4 w-4 text-slate-500" />
                     <span>Mon CV</span>
-                    <span className="ml-auto text-xs text-slate-400 font-normal">Prochainement</span>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuItem onClick={() => handleNav('profile', { tab: 'wallet' })} className="cursor-pointer">
+                    <Wallet className="mr-2 h-4 w-4 text-slate-500" />
+                    <span>Wallet</span>
+                    {walletBalance !== null && (
+                      <span className="ml-auto text-xs font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                        {walletBalance.toFixed(0)} MAD
+                      </span>
+                    )}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleNav('profile', { tab: 'requests' })} className="cursor-pointer">
+                    <Inbox className="mr-2 h-4 w-4 text-slate-500" />
+                    <span>Mes demandes</span>
+                    {activeRequestsCount > 0 && (
+                      <span className="ml-auto text-xs font-bold text-white bg-red-500 px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+                        +{activeRequestsCount}
+                      </span>
+                    )}
                   </DropdownMenuItem>
 
                   <DropdownMenuSeparator />
@@ -308,8 +364,8 @@ export default function Header({ currentPage, onNavigate, onAuthOpen, user, onLo
                       <div className="space-y-1">
                         {/* User identity */}
                         <div className="flex items-center gap-3 px-2 py-2 mb-2">
-                          <div className="h-9 w-9 rounded-full bg-emerald-600 flex items-center justify-center text-white text-sm font-bold shrink-0">
-                            {avatarLetter}
+                          <div className="h-9 w-9 rounded-full bg-emerald-600 flex items-center justify-center text-white text-sm font-bold shrink-0 overflow-hidden">
+                            {userAvatar ? <img src={userAvatar} alt={user.name} className="h-full w-full object-cover" /> : avatarLetter}
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="text-sm font-medium text-slate-900 truncate">{user.name}</div>
@@ -342,12 +398,35 @@ export default function Header({ currentPage, onNavigate, onAuthOpen, user, onLo
                           <span>Mes attestations</span>
                         </button>
                         <button
-                          disabled
-                          className="w-full flex items-center gap-3 px-2 py-2.5 rounded-lg text-sm text-slate-400 cursor-not-allowed"
+                          onClick={() => handleNav('profile', { tab: 'cv' })}
+                          className="w-full flex items-center gap-3 px-2 py-2.5 rounded-lg text-sm text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 transition-colors cursor-pointer"
                         >
-                          <FileText className="h-4 w-4 text-slate-300 shrink-0" />
+                          <FileText className="h-4 w-4 text-slate-400 shrink-0" />
                           <span>Mon CV</span>
-                          <span className="ml-auto text-xs text-slate-400">Prochainement</span>
+                        </button>
+                        <button
+                          onClick={() => handleNav('profile', { tab: 'wallet' })}
+                          className="w-full flex items-center gap-3 px-2 py-2.5 rounded-lg text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                        >
+                          <Wallet className="h-4 w-4 text-slate-400 shrink-0" />
+                          <span>Wallet</span>
+                          {walletBalance !== null && (
+                            <span className="ml-auto text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                              {walletBalance.toFixed(0)} MAD
+                            </span>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => handleNav('profile', { tab: 'requests' })}
+                          className="w-full flex items-center gap-3 px-2 py-2.5 rounded-lg text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                        >
+                          <Inbox className="h-4 w-4 text-slate-400 shrink-0" />
+                          <span>Mes demandes</span>
+                          {activeRequestsCount > 0 && (
+                            <span className="ml-auto text-xs font-bold text-white bg-red-500 px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+                              +{activeRequestsCount}
+                            </span>
+                          )}
                         </button>
 
                         <div className="h-px bg-slate-200 my-2" />

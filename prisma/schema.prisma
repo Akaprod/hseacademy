@@ -14,6 +14,7 @@ model User {
   password      String?
   phone         String?
   role          String   @default("user") // user, admin
+  status        String   @default("active") // active, disabled, blocked
   avatar        String?
   bio           String?
   createdAt     DateTime @default(now())
@@ -115,6 +116,33 @@ model Formation {
   coverImage        String?
   featured          Boolean  @default(false)
   order             Int      @default(0)
+
+  // ===== ARCHIVE (soft delete) =====
+  archived          Boolean  @default(false)
+
+  // ===== SEO (shared by both types) =====
+  seoTitle          String?
+  seoDescription    String?
+  seoKeywords       String?
+  seoImage          String?
+  seoSlug           String?   @unique
+  seoRobots         String   @default("index,follow")
+  seoCanonical      String?
+  seoOgTitle        String?
+  seoOgDescription  String?
+  seoOgImage        String?
+
+  // ===== DIPLÔMANTES-specific =====
+  careerOutcomes    String   @default("[]")   // JSON array of métiers accessibles
+  degreeType         String?
+
+  // ===== CERTIFIANTES-specific =====
+  certificateValidity      String?
+  certificatePrefix        String?
+  mandatoryPrerequisites   String   @default("[]")  // JSON array
+  targetAudience           String?
+  certifyingBody           String?
+
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 }
@@ -326,8 +354,25 @@ model UserProfile {
   cvLayout        String   @default("sidebar") // sidebar | centered | split
   cvTitle         String?  // Titre professionnel (ex: "Technicien QHSE")
   cvBio           String?  // Bio courte pour le CV
-  cvSkills        String   @default("[]") // JSON array de compétences
-  cvExperience    String   @default("[]") // JSON array d'expériences
+  cvSkills        String   @default("[]") // JSON array de compétences (legacy: array de strings)
+  cvExperience    String   @default("[]") // JSON array d'expériences (legacy)
+
+  // ===== 7 RUBRIQUES CV PROFESSIONNEL (ajout Sept 2026) =====
+  // Toutes stockées en JSON — pas de tables séparées pour rester compatible SQLite
+  // et éviter des migrations lourdes. Les champs sont additifs (non destructifs).
+  cvProfessionalProfile String? // 1. Présentation professionnelle (textarea, ~500-1000 chars)
+  cvExperiences    String   @default("[]") // 2. JSON array d'expériences professionnelles
+  cvEducation      String   @default("[]") // 3. JSON array de formations & diplômes
+  cvSkillsStructured String @default("[]") // 4. JSON array de compétences structurées (nom + niveau + catégorie) — cvSkills (legacy) reste pour rétro-compat
+  cvCertifications String   @default("[]") // 5. JSON array de certifications & attestations
+  cvLanguages      String   @default("[]") // 6. JSON array de langues
+  cvAdditionalInfo String   @default("{}") // 7. JSON object : permis, mobilité, disponibilité, projets, centres d'intérêt
+  cvVolunteer      String   @default("[]") // 7b. JSON array d'expériences de bénévolat
+
+  // ===== Coordonnées professionnelles CV (Contact section) =====
+  cvContactPhone    String?  // Téléphone professionnel
+  cvContactEmail    String?  // Email professionnel
+  cvContactLocation String?  // Localisation professionnelle
 
   // Vérification
   emailVerified   Boolean  @default(false)
@@ -542,6 +587,9 @@ model WalletTransaction {
   // Promotion (si bonus)
   promotionId     String?
 
+  // Pour les paiements via payment-request : référence vers la demande
+  paymentRequestId String?
+
   createdAt       DateTime @default(now())
 
   @@index([walletId])
@@ -643,4 +691,63 @@ model PaymentRequest {
   @@index([userId])
   @@index([reqStatus])
   @@index([reqType])
+}
+
+// ============================================================================
+// PROFIL DU SITE — singleton (id = "default")
+// ============================================================================
+
+model SiteProfile {
+  id              String   @id @default("default")
+
+  // Identité du site
+  siteName        String?  // HSE Academy
+  siteLogo        String?  // URL logo / miniature
+  siteDescription String?  // Meta description par défaut
+  siteKeywords    String?  // Mots-clés SEO globaux (comma-separated)
+  siteUrl         String?  // URL canonique (https://hseacademy.online)
+  gscVerification String?  // Google Search Console verification ID
+
+  // Réseaux sociaux (JSON-LD Organization)
+  facebook        String?
+  twitter         String?
+  linkedin        String?
+  instagram       String?
+  youtube         String?
+
+  // Sitemap
+  sitemapUrl      String?  // URL du sitemap soumis (généré automatiquement)
+  sitemapUpdatedAt DateTime?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ============================================================================
+// VISITES — tracker maison
+// ============================================================================
+
+model Visit {
+  id              String   @id @default(cuid())
+  // Page visitée
+  path            String   // ex: "/", "/f/master-professionnel-qhse", "/pages/hse"
+  pageType        String   // "home", "formation", "page_seo", "article", "course", "cv_public"
+  referrer        String?  // URL referrer (referer HTTP) — pour identifier google/facebook/direct
+  referrerSource  String?  // ex: "direct", "google", "facebook", "twitter", "linkedin", "other"
+
+  // Visiteur
+  ip              String?  // IP hashée (privacy — pas l'IP brute)
+  userAgent       String?  // User-Agent (pour identifier bots vs humans)
+  country         String?  // Pays via IP-API (ex: "Morocco", "France")
+  countryCode     String?  // Code ISO (ex: "MA", "FR")
+  city            String?  // Ville
+  sessionId       String?  // Session ID (hash aléatoire stocké en localStorage côté client)
+
+  createdAt       DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([path])
+  @@index([country])
+  @@index([referrerSource])
+  @@index([pageType])
 }

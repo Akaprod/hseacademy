@@ -11,7 +11,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const { id } = await params;
     const user = await db.user.findUnique({
       where: { id },
-      select: { id: true, name: true, email: true, phone: true, role: true, avatar: true, bio: true, createdAt: true, _count: { select: { comments: true, certifications: true } } },
+      select: { id: true, name: true, email: true, phone: true, role: true, status: true, avatar: true, bio: true, createdAt: true, _count: { select: { comments: true, certifications: true } } },
     });
     if (!user) return NextResponse.json({ error: 'Utilisateur non trouvé' }, { status: 404 });
 

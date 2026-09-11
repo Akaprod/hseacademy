@@ -47,10 +47,15 @@ export default async function CVPage({ params }: { params: Promise<{ username: s
 
   const profile = await db.userProfile.findUnique({
     where: { username },
-    include: { user: { select: { id: true, name: true, createdAt: true } } },
+    include: { user: { select: { id: true, name: true, createdAt: true, status: true } } },
   });
 
   if (!profile || !profile.profilePublic) {
+    notFound();
+  }
+
+  // Masquer le CV public si le compte est désactivé ou bloqué
+  if (profile.user.status === 'disabled' || profile.user.status === 'blocked') {
     notFound();
   }
 
@@ -82,6 +87,22 @@ export default async function CVPage({ params }: { params: Promise<{ username: s
   try { skills = JSON.parse(profile.cvSkills || '[]'); } catch {}
   try { experience = JSON.parse(profile.cvExperience || '[]'); } catch {}
 
+  // Parser les 7 nouvelles rubriques CV
+  let cvExperiences: any[] = [];
+  let cvEducation: any[] = [];
+  let cvSkillsStructured: any[] = [];
+  let cvCertifications: any[] = [];
+  let cvLanguages: any[] = [];
+  let cvAdditionalInfo: any = {};
+  let cvVolunteer: any[] = [];
+  try { cvExperiences = JSON.parse(profile.cvExperiences || '[]'); } catch {}
+  try { cvEducation = JSON.parse(profile.cvEducation || '[]'); } catch {}
+  try { cvSkillsStructured = JSON.parse(profile.cvSkillsStructured || '[]'); } catch {}
+  try { cvCertifications = JSON.parse(profile.cvCertifications || '[]'); } catch {}
+  try { cvLanguages = JSON.parse(profile.cvLanguages || '[]'); } catch {}
+  try { cvAdditionalInfo = JSON.parse(profile.cvAdditionalInfo || '{}'); } catch {}
+  try { cvVolunteer = JSON.parse(profile.cvVolunteer || '[]'); } catch {}
+
   const cvData = {
     profile: {
       username: profile.username,
@@ -90,8 +111,23 @@ export default async function CVPage({ params }: { params: Promise<{ username: s
       cvTitle: profile.cvTitle,
       cvBio: profile.cvBio,
       cvTemplate: profile.cvTemplate,
+      cvColorPrimary: profile.cvColorPrimary,
+      cvColorAccent: profile.cvColorAccent,
+      cvLayout: profile.cvLayout,
       skills,
       experience,
+      cvProfessionalProfile: profile.cvProfessionalProfile,
+      cvExperiences,
+      cvEducation,
+      cvSkillsStructured,
+      cvCertifications,
+      cvLanguages,
+      cvAdditionalInfo,
+      cvVolunteer,
+      cvContactPhone: profile.cvContactPhone,
+      cvContactEmail: profile.cvContactEmail,
+      cvContactLocation: profile.cvContactLocation,
+      birthDate: profile.birthDate ? profile.birthDate.toISOString() : null,
       facebook: profile.facebook,
       linkedin: profile.linkedin,
       twitter: profile.twitter,

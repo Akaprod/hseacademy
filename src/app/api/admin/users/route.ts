@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     const [users, total] = await Promise.all([
       db.user.findMany({
         orderBy: { createdAt: 'desc' },
-        select: { id: true, name: true, email: true, phone: true, role: true, avatar: true, bio: true, createdAt: true },
+        select: { id: true, name: true, email: true, phone: true, role: true, status: true, avatar: true, bio: true, createdAt: true },
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
       }))
     );
 
-    return NextResponse.json({ users: usersWithRootFlag, total, page, limit, pages: Math.ceil(total / limit) });
+    return NextResponse.json({ users: usersWithRootFlag, total, page, limit, totalPages: Math.ceil(total / limit) });
   } catch {
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
   }
@@ -64,7 +64,7 @@ export async function PUT(request: NextRequest) {
     const user = await db.user.update({
       where: { id },
       data: { role },
-      select: { id: true, name: true, email: true, role: true },
+      select: { id: true, name: true, email: true, role: true, status: true },
     });
     return NextResponse.json({ user });
   } catch {

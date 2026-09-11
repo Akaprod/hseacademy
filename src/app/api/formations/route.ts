@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
     const featured = url.get('featured');
     const type = url.get('type');
 
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = { archived: false };
     if (level && level !== 'all') where.level = level;
     if (featured === 'true') where.featured = true;
     if (type) where.type = type;

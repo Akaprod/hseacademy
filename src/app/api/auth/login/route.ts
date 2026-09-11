@@ -22,6 +22,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email ou mot de passe incorrect' }, { status: 401 });
     }
 
+    // Vérifier le statut du compte
+    if (user.status === 'disabled') {
+      return NextResponse.json({
+        error: 'Votre compte est désactivé. Veuillez contacter l\'administration pour le réactiver.',
+      }, { status: 403 });
+    }
+    if (user.status === 'blocked') {
+      return NextResponse.json({
+        error: 'Votre compte a été bloqué. Veuillez contacter l\'administration.',
+      }, { status: 403 });
+    }
+
     // Pose le cookie httpOnly signé
     await setSessionCookie(user.id);
 

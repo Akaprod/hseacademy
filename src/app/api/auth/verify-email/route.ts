@@ -16,15 +16,15 @@ export async function GET(req: NextRequest) {
     });
 
     if (!record) {
-      return NextResponse.redirect(new URL('/?verify=invalid', req.url));
+      return NextResponse.redirect('https://hseacademy.online/?verify=invalid');
     }
 
     if (record.usedAt) {
-      return NextResponse.redirect(new URL('/?verify=already-used', req.url));
+      return NextResponse.redirect('https://hseacademy.online/?verify=already-used');
     }
 
     if (record.expiresAt < new Date()) {
-      return NextResponse.redirect(new URL('/?verify=expired', req.url));
+      return NextResponse.redirect('https://hseacademy.online/?verify=expired');
     }
 
     // Marquer comme utilisé
@@ -40,9 +40,9 @@ export async function GET(req: NextRequest) {
       update: { emailVerified: true, emailVerifiedAt: new Date() },
     });
 
-    return NextResponse.redirect(new URL('/?verify=success', req.url));
+    return NextResponse.redirect('https://hseacademy.online/?verify=success');
   } catch (error) {
     console.error('GET /api/auth/verify-email error:', error);
-    return NextResponse.redirect(new URL('/?verify=error', req.url));
+    return NextResponse.redirect('https://hseacademy.online/?verify=error');
   }
 }

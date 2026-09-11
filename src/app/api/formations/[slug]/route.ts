@@ -5,7 +5,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const { slug } = await params;
     const formation = await db.formation.findUnique({ where: { slug } });
-    if (!formation) {
+    if (!formation || formation.archived) {
       return NextResponse.json({ error: 'Formation non trouvée' }, { status: 404 });
     }
     return NextResponse.json({ formation });

@@ -8,6 +8,8 @@ import {
   Plus, Pencil, Trash2, Search, Eye, EyeOff, Check, X, Clock,
   TrendingUp, BarChart3, LogOut, ArrowLeft, Lock, CreditCard, FileCheck,
   Settings, Save, Scale, Globe, Wallet,
+  Archive, ArchiveRestore, ExternalLink,
+  BarChart2, MapPin, Link2, RefreshCw,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -17,6 +19,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
@@ -30,6 +33,7 @@ import {
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -65,7 +69,7 @@ interface OverviewStats {
   totalTestimonials: number; totalPages: number; totalMenus: number;
 }
 
-type Section = 'dashboard' | 'articles' | 'certifications' | 'formations' | 'categories' | 'pages' | 'menus' | 'comments' | 'newsletter' | 'contacts' | 'users' | 'testimonials' | 'payments' | 'legal' | 'paymentSettings';
+type Section = 'dashboard' | 'articles' | 'certifications' | 'formationsDiplomantes' | 'formationsCertifiantes' | 'categories' | 'pages' | 'menus' | 'comments' | 'newsletter' | 'contacts' | 'users' | 'userDetail' | 'testimonials' | 'payments' | 'legal' | 'paymentSettings' | 'siteProfile' | 'stats';
 
 interface NavItem {
   id: Section;
@@ -276,12 +280,31 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
   const [certForm, setCertForm] = useState({ certificateNo: '', type: 'attestation', fullName: '', programName: '', level: 'technicien', issuedDate: '', expirationDate: '', status: 'valid' });
   const [certsLoading, setCertsLoading] = useState(false);
 
-  // Formations
-  const [formations, setFormations] = useState<any[]>([]);
+  // Formations — split Diplômantes / Certifiantes
+  const [diplomantes, setDiplomantes] = useState<any[]>([]);
+  const [certifiantes, setCertifiantes] = useState<any[]>([]);
   const [formationModalOpen, setFormationModalOpen] = useState(false);
   const [editingFormation, setEditingFormation] = useState<any>(null);
-  const [formationForm, setFormationForm] = useState({ title: '', slug: '', shortDescription: '', fullDescription: '', level: 'technicien', duration: '', prerequisites: '', objectives: '', program: '', price: '', mode: 'presentiel', coverImage: '', featured: false, order: 0 });
-  const [formationsLoading, setFormationsLoading] = useState(false);
+  const [formationForm, setFormationForm] = useState({
+    // Common
+    title: '', slug: '', shortDescription: '', fullDescription: '', level: 'technicien',
+    duration: '', durationHours: '', prerequisites: '', objectives: '', program: '',
+    price: '', priceIndividual: '', priceGroup: '', priceEnterprise: '',
+    mode: 'presentiel', type: 'diplomante' as 'diplomante' | 'certifiante',
+    coverImage: '', featured: false, order: 0, archived: false,
+    // SEO
+    seoTitle: '', seoDescription: '', seoKeywords: '', seoImage: '',
+    seoSlug: '', seoRobots: 'index,follow', seoCanonical: '',
+    seoOgTitle: '', seoOgDescription: '', seoOgImage: '',
+    // Diplômantes-specific
+    careerOutcomes: '', degreeType: '',
+    // Certifiantes-specific
+    certificateValidity: '', certificatePrefix: '',
+    mandatoryPrerequisites: '', targetAudience: '', certifyingBody: '',
+  });
+  const [formationTab, setFormationTab] = useState<'general' | 'specific' | 'seo'>('general');
+  const [diplomantesLoading, setDiplomantesLoading] = useState(false);
+  const [certifiantesLoading, setCertifiantesLoading] = useState(false);
 
   // Categories
   const [categoriesList, setCategoriesList] = useState<any[]>([]);
@@ -339,12 +362,21 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
   const [users, setUsers] = useState<any[]>([]);
   const [usersTotal, setUsersTotal] = useState(0);
   const [usersPages, setUsersPages] = useState(1);
+  const [usersSearch, setUsersSearch] = useState('');
   const [payments, setPayments] = useState<any[]>([]);
   const [paymentsLoading, setPaymentsLoading] = useState(false);
   const [paymentsTotal, setPaymentsTotal] = useState(0);
   const [payStatusFilter, setPayStatusFilter] = useState('');
   const [usersPage, setUsersPage] = useState(1);
   const [usersLoading, setUsersLoading] = useState(false);
+  // User detail
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [userDetail, setUserDetail] = useState<any>(null);
+  const [userDetailLoading, setUserDetailLoading] = useState(false);
+  const [userDetailTab, setUserDetailTab] = useState<'info' | 'wallet' | 'formations' | 'payments'>('info');
+  const [newPassword, setNewPassword] = useState('');
+  const [newUsername, setNewUsername] = useState('');
+  const [savingUser, setSavingUser] = useState(false);
 
   // Testimonials
   const [testimonials, setTestimonials] = useState<any[]>([]);
@@ -386,6 +418,22 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentSaving, setPaymentSaving] = useState(false);
 
+  // ===== Site Profile =====
+  const [siteProfileForm, setSiteProfileForm] = useState({
+    siteName: '', siteLogo: '', siteDescription: '', siteKeywords: '', siteUrl: '',
+    gscVerification: '',
+    facebook: '', twitter: '', linkedin: '', instagram: '', youtube: '',
+  });
+  const [siteProfileLoading, setSiteProfileLoading] = useState(false);
+  const [siteProfileSaving, setSiteProfileSaving] = useState(false);
+  const [sitemapInfo, setSitemapInfo] = useState<{ sitemapUrl: string | null; sitemapUpdatedAt: string | null; urlCount?: number; pingResult?: string } | null>(null);
+  const [generatingSitemap, setGeneratingSitemap] = useState(false);
+
+  // ===== Stats =====
+  const [statsData, setStatsData] = useState<any>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsPeriod, setStatsPeriod] = useState<'today' | '7d' | '30d' | '90d' | 'year' | 'all'>('30d');
+
   // General loading
   const [dashboardLoading, setDashboardLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -398,7 +446,8 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
     { id: 'dashboard', label: 'Tableau de Bord', icon: LayoutDashboard },
     { id: 'articles', label: 'Articles', icon: FileText },
     { id: 'certifications', label: 'Certifications', icon: Award },
-    { id: 'formations', label: 'Formations', icon: GraduationCap },
+    { id: 'formationsDiplomantes', label: 'Formations Diplômantes', icon: GraduationCap },
+    { id: 'formationsCertifiantes', label: 'Formations Certifiantes', icon: Shield },
     { id: 'categories', label: 'Catégories', icon: FolderOpen },
     { id: 'pages', label: 'Pages', icon: File },
     { id: 'menus', label: 'Menus', icon: Menu },
@@ -410,6 +459,8 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
     { id: 'payments', label: 'Paiements', icon: CreditCard },
     { id: 'legal', label: 'Informations Légales', icon: Scale },
     { id: 'paymentSettings', label: 'Paramètres Paiement', icon: Wallet },
+    { id: 'siteProfile', label: 'Profil du Site', icon: Settings },
+    { id: 'stats', label: 'Statistiques', icon: BarChart2 },
   ];
 
   // ============================================================
@@ -514,16 +565,21 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
     }
   }, [api, certsPage, certsSearch, certsStatusFilter, certsTypeFilter]);
 
-  // Formations
-  const fetchFormations = useCallback(async () => {
-    setFormationsLoading(true);
+  // Formations — fetcher accepts type ('diplomante' or 'certifiante')
+  const fetchFormations = useCallback(async (type: 'diplomante' | 'certifiante') => {
+    if (type === 'diplomante') setDiplomantesLoading(true);
+    else setCertifiantesLoading(true);
     try {
-      const data = await api('/api/admin/formations');
-      setFormations(data.formations || []);
+      // archived=all → return both active and archived for admin to manage
+      const data = await api(`/api/admin/formations?type=${type}&archived=all`);
+      const list = data.formations || [];
+      if (type === 'diplomante') setDiplomantes(list);
+      else setCertifiantes(list);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Erreur');
     } finally {
-      setFormationsLoading(false);
+      if (type === 'diplomante') setDiplomantesLoading(false);
+      else setCertifiantesLoading(false);
     }
   }, [api]);
 
@@ -550,7 +606,7 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
       const data = await api(`/api/admin/pages?${params}`);
       setPages(data.pages || []);
       setPagesTotal(data.total || 0);
-      setPagesPagination(data.pages || 1);
+      setPagesPagination(data.totalPages || 1);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Erreur');
     } finally {
@@ -626,6 +682,7 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
     setUsersLoading(true);
     try {
       const params = new URLSearchParams({ page: String(usersPage), limit: '15' });
+      if (usersSearch) params.set('search', usersSearch);
       const data = await api(`/api/admin/users?${params}`);
       setUsers(data.users || []);
       setUsersTotal(data.total || 0);
@@ -635,7 +692,70 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
     } finally {
       setUsersLoading(false);
     }
-  }, [api, usersPage]);
+  }, [api, usersPage, usersSearch]);
+
+  // Fetch user detail
+  const fetchUserDetail = useCallback(async (id: string) => {
+    setUserDetailLoading(true);
+    try {
+      const data = await api(`/api/admin/users/${id}`);
+      setUserDetail(data);
+      setNewUsername(data.profile?.username || '');
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Erreur');
+    } finally {
+      setUserDetailLoading(false);
+    }
+  }, [api]);
+
+  // Update user status
+  const updateUserStatus = async (id: string, status: string) => {
+    try {
+      await api(`/api/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
+      toast.success(status === 'active' ? 'Compte activé' : status === 'disabled' ? 'Compte désactivé' : 'Compte bloqué');
+      fetchUserDetail(id);
+      fetchUsers();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Erreur');
+    }
+  };
+
+  // Reset password
+  const resetPassword = async (id: string) => {
+    if (!newPassword || newPassword.length < 6) {
+      toast.error('Mot de passe minimum 6 caractères');
+      return;
+    }
+    setSavingUser(true);
+    try {
+      await api(`/api/admin/users/${id}/password`, { method: 'PATCH', body: JSON.stringify({ password: newPassword }) });
+      toast.success('Mot de passe réinitialisé');
+      setNewPassword('');
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Erreur');
+    } finally {
+      setSavingUser(false);
+    }
+  };
+
+  // Change username
+  const changeUsername = async (id: string) => {
+    if (!newUsername || newUsername.length < 5) {
+      toast.error('Username minimum 5 caractères');
+      return;
+    }
+    setSavingUser(true);
+    try {
+      await api(`/api/admin/users/${id}/username`, { method: 'PATCH', body: JSON.stringify({ username: newUsername }) });
+      toast.success('Username modifié');
+      fetchUserDetail(id);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Erreur');
+    } finally {
+      setSavingUser(false);
+    }
+  };
+
 
   // Testimonials
   const fetchTestimonials = useCallback(async () => {
@@ -664,7 +784,8 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
       case 'dashboard': fetchDashboard(); break;
       case 'articles': fetchArticles(); fetchCategories(); break;
       case 'certifications': fetchCerts(); break;
-      case 'formations': fetchFormations(); break;
+      case 'formationsDiplomantes': fetchFormations('diplomante'); break;
+      case 'formationsCertifiantes': fetchFormations('certifiante'); break;
       case 'categories': fetchCategoriesList(); break;
       case 'pages': fetchPages(); break;
       case 'menus': fetchMenus(); break;
@@ -1211,7 +1332,77 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
     </div>
   );
 
-  // ----- FORMATIONS -----
+  // ----- FORMATIONS (Diplômantes + Certifiantes) -----
+  // Helper: parse array field from DB (objectives, program, careerOutcomes, mandatoryPrerequisites)
+  const parseArrayField = (val: unknown): string => {
+    if (!val) return '';
+    if (Array.isArray(val)) return val.join('\n');
+    if (typeof val === 'string') {
+      try { const p = JSON.parse(val); return Array.isArray(p) ? p.join('\n') : ''; } catch { return ''; }
+    }
+    return '';
+  };
+
+  // Default empty form — used on "Create new"
+  const resetFormationForm = (type: 'diplomante' | 'certifiante') => setFormationForm({
+    title: '', slug: '', shortDescription: '', fullDescription: '',
+    level: type === 'diplomante' ? 'technicien' : 'sauvetage',
+    duration: '', durationHours: '', prerequisites: '', objectives: '', program: '',
+    price: '', priceIndividual: '', priceGroup: '', priceEnterprise: '',
+    mode: 'presentiel', type,
+    coverImage: '', featured: false, order: 0, archived: false,
+    seoTitle: '', seoDescription: '', seoKeywords: '', seoImage: '',
+    seoSlug: '', seoRobots: 'index,follow', seoCanonical: '',
+    seoOgTitle: '', seoOgDescription: '', seoOgImage: '',
+    careerOutcomes: '', degreeType: '',
+    certificateValidity: '', certificatePrefix: '',
+    mandatoryPrerequisites: '', targetAudience: '', certifyingBody: '',
+  });
+
+  // Open dialog for CREATE
+  const openCreateFormation = (type: 'diplomante' | 'certifiante') => {
+    setEditingFormation(null);
+    resetFormationForm(type);
+    setFormationTab('general');
+    setFormationModalOpen(true);
+  };
+
+  // Open dialog for EDIT — hydrate form from existing row
+  const openEditFormation = (f: any) => {
+    setEditingFormation(f);
+    setFormationForm({
+      title: f.title || '', slug: f.slug || '', shortDescription: f.shortDescription || '',
+      fullDescription: f.fullDescription || '',
+      level: f.level || (f.type === 'certifiante' ? 'sauvetage' : 'technicien'),
+      duration: f.duration || '', durationHours: f.durationHours || '',
+      prerequisites: f.prerequisites || '',
+      objectives: parseArrayField(f.objectives),
+      program: parseArrayField(f.program),
+      price: f.price ? String(f.price) : '',
+      priceIndividual: f.priceIndividual || '',
+      priceGroup: f.priceGroup || '',
+      priceEnterprise: f.priceEnterprise || '',
+      mode: f.mode || 'presentiel',
+      type: (f.type === 'certifiante') ? 'certifiante' : 'diplomante',
+      coverImage: f.coverImage || '', featured: f.featured || false,
+      order: f.order || 0, archived: f.archived || false,
+      seoTitle: f.seoTitle || '', seoDescription: f.seoDescription || '',
+      seoKeywords: f.seoKeywords || '', seoImage: f.seoImage || '',
+      seoSlug: f.seoSlug || '', seoRobots: f.seoRobots || 'index,follow',
+      seoCanonical: f.seoCanonical || '',
+      seoOgTitle: f.seoOgTitle || '', seoOgDescription: f.seoOgDescription || '',
+      seoOgImage: f.seoOgImage || '',
+      careerOutcomes: parseArrayField(f.careerOutcomes),
+      degreeType: f.degreeType || '',
+      certificateValidity: f.certificateValidity || '',
+      certificatePrefix: f.certificatePrefix || '',
+      mandatoryPrerequisites: parseArrayField(f.mandatoryPrerequisites),
+      targetAudience: f.targetAudience || '', certifyingBody: f.certifyingBody || '',
+    });
+    setFormationTab('general');
+    setFormationModalOpen(true);
+  };
+
   const handleFormationSubmit = async () => {
     if (!formationForm.title || !formationForm.shortDescription) {
       toast.error('Titre et description requis');
@@ -1219,12 +1410,19 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
     }
     setSaving(true);
     try {
+      // Build payload — string arrays before send
       const payload = {
         ...formationForm,
         objectives: formationForm.objectives ? formationForm.objectives.split('\n').filter(Boolean) : [],
         program: formationForm.program ? formationForm.program.split('\n').filter(Boolean) : [],
+        careerOutcomes: formationForm.careerOutcomes ? formationForm.careerOutcomes.split('\n').filter(Boolean) : [],
+        mandatoryPrerequisites: formationForm.mandatoryPrerequisites ? formationForm.mandatoryPrerequisites.split('\n').filter(Boolean) : [],
         price: formationForm.price ? parseFloat(formationForm.price) : null,
         prerequisites: formationForm.prerequisites || null,
+        durationHours: formationForm.durationHours || null,
+        priceIndividual: formationForm.priceIndividual || null,
+        priceGroup: formationForm.priceGroup || null,
+        priceEnterprise: formationForm.priceEnterprise || null,
       };
       if (editingFormation) {
         await api(`/api/admin/formations/${editingFormation.id}`, { method: 'PUT', body: JSON.stringify(payload) });
@@ -1235,8 +1433,8 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
       }
       setFormationModalOpen(false);
       setEditingFormation(null);
-      setFormationForm({ title: '', slug: '', shortDescription: '', fullDescription: '', level: 'technicien', duration: '', prerequisites: '', objectives: '', program: '', price: '', mode: 'presentiel', coverImage: '', featured: false, order: 0 });
-      fetchFormations();
+      resetFormationForm(formationForm.type);
+      fetchFormations(formationForm.type);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Erreur');
     } finally {
@@ -1244,73 +1442,247 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
     }
   };
 
-  const deleteFormation = async (id: string) => {
-    if (!window.confirm('Supprimer cette formation ?')) return;
+  const deleteFormation = async (id: string, type: 'diplomante' | 'certifiante') => {
+    if (!window.confirm('Supprimer définitivement cette formation ? Cette action est irréversible.')) return;
     try {
       await api(`/api/admin/formations/${id}`, { method: 'DELETE' });
       toast.success('Formation supprimée');
-      fetchFormations();
+      fetchFormations(type);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Erreur');
     }
   };
 
-  const renderFormations = () => (
-    <div>
-      <SectionHeader title="Formations" onAdd={() => { setEditingFormation(null); setFormationForm({ title: '', slug: '', shortDescription: '', fullDescription: '', level: 'technicien', duration: '', prerequisites: '', objectives: '', program: '', price: '', mode: 'presentiel', coverImage: '', featured: false, order: 0 }); setFormationModalOpen(true); }} />
+  const archiveFormation = async (id: string, type: 'diplomante' | 'certifiante') => {
+    try {
+      await api(`/api/admin/formations/${id}/archive`, { method: 'POST' });
+      toast.success('Formation archivée');
+      fetchFormations(type);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Erreur');
+    }
+  };
 
-      {formationsLoading ? <LoadingSkeleton /> : (
+  const unarchiveFormation = async (id: string, type: 'diplomante' | 'certifiante') => {
+    try {
+      await api(`/api/admin/formations/${id}/unarchive`, { method: 'POST' });
+      toast.success('Formation restaurée');
+      fetchFormations(type);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Erreur');
+    }
+  };
+
+  // Render row action buttons — shared between both lists
+  const renderFormationActions = (f: any, type: 'diplomante' | 'certifiante') => (
+    <div className="flex items-center justify-end gap-1">
+      {/* Voir page SEO */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8 text-blue-500 hover:text-blue-700"
+        title="Voir la page SEO"
+        onClick={() => window.open(`/f/${f.seoSlug || f.slug}`, '_blank')}
+      >
+        <ExternalLink className="h-4 w-4" />
+      </Button>
+      {/* Éditer */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8"
+        title="Modifier"
+        onClick={() => openEditFormation(f)}
+      >
+        <Pencil className="h-4 w-4" />
+      </Button>
+      {/* Archiver / Désarchiver */}
+      {f.archived ? (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-emerald-500 hover:text-emerald-700"
+          title="Désarchiver (rendre visible)"
+          onClick={() => unarchiveFormation(f.id, type)}
+        >
+          <ArchiveRestore className="h-4 w-4" />
+        </Button>
+      ) : (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-amber-500 hover:text-amber-700"
+          title="Archiver (masquer sans supprimer)"
+          onClick={() => archiveFormation(f.id, type)}
+        >
+          <Archive className="h-4 w-4" />
+        </Button>
+      )}
+      {/* Supprimer (hard delete) */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8 text-red-500 hover:text-red-700"
+        title="Supprimer définitivement"
+        onClick={() => deleteFormation(f.id, type)}
+      >
+        <Trash2 className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+
+  // Level labels for the table rows
+  const levelLabels: Record<string, string> = {
+    'diplome-qualifie': 'Diplôme Qualifié',
+    'technicien': 'Technicien',
+    'technicien-superieur': 'Technicien Sup.',
+    'licence': 'Licence Pro',
+    'master': 'Master',
+    'vae': 'VAE',
+    'sauvetage': 'Sauvetage',
+    'habilitation': 'Habilitation',
+    'prevention': 'Prévention',
+    'management': 'Management',
+  };
+
+  const modeLabels: Record<string, string> = {
+    'presentiel': 'Présentiel',
+    'distance': 'À distance',
+    'hybride': 'Hybride',
+  };
+
+  // ----- renderFormationsDiplomantes -----
+  const renderFormationsDiplomantes = () => (
+    <div>
+      <SectionHeader
+        title="Formations Diplômantes"
+        subtitle="Formations diplômantes QHSE (6 niveaux)"
+        onAdd={() => openCreateFormation('diplomante')}
+      />
+
+      {diplomantesLoading ? <LoadingSkeleton /> : (
         <Card>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Titre</TableHead>
                 <TableHead className="hidden md:table-cell">Niveau</TableHead>
+                <TableHead className="hidden md:table-cell">Mode</TableHead>
                 <TableHead className="hidden md:table-cell">Durée</TableHead>
-                <TableHead className="hidden lg:table-cell">Mode</TableHead>
                 <TableHead>Prix</TableHead>
+                <TableHead className="hidden lg:table-cell">Statut</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {formations.length === 0 ? (
-                <TableRow><TableCell colSpan={6} className="text-center py-8 text-slate-400">Aucune formation</TableCell></TableRow>
-              ) : formations.map((f: any) => (
-                <TableRow key={f.id} className="hover:bg-slate-50">
-                  <TableCell className="font-medium">{f.title}</TableCell>
-                  <TableCell className="hidden md:table-cell capitalize">{f.level}</TableCell>
-                  <TableCell className="hidden md:table-cell text-sm text-slate-600">{f.duration}</TableCell>
-                  <TableCell className="hidden lg:table-cell capitalize">{f.mode}</TableCell>
-                  <TableCell className="text-sm">{f.price ? `${f.price} MAD` : 'Gratuit'}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
-                        setEditingFormation(f);
-                        setFormationForm({
-                          title: f.title, slug: f.slug || '', shortDescription: f.shortDescription, fullDescription: f.fullDescription || '',
-                          level: f.level, duration: f.duration || '', prerequisites: f.prerequisites || '',
-                          objectives: Array.isArray(f.objectives) ? (typeof f.objectives === 'string' ? JSON.parse(f.objectives) : f.objectives).join('\n') : '',
-                          program: Array.isArray(f.program) ? (typeof f.program === 'string' ? JSON.parse(f.program) : f.program).join('\n') : '',
-                          price: f.price ? String(f.price) : '', mode: f.mode || 'presentiel', coverImage: f.coverImage || '', featured: f.featured || false, order: f.order || 0,
-                        });
-                        setFormationModalOpen(true);
-                      }}><Pencil className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-700" onClick={() => deleteFormation(f.id)}><Trash2 className="h-4 w-4" /></Button>
-                    </div>
+              {diplomantes.length === 0 ? (
+                <TableRow><TableCell colSpan={7} className="text-center py-8 text-slate-400">Aucune formation diplômante</TableCell></TableRow>
+              ) : diplomantes.map((f: any) => (
+                <TableRow key={f.id} className={f.archived ? 'opacity-60 bg-slate-50' : 'hover:bg-slate-50'}>
+                  <TableCell className="font-medium">
+                    {f.title}
+                    {f.featured && <Star className="inline-block h-3 w-3 ml-1 text-amber-500" />}
                   </TableCell>
+                  <TableCell className="hidden md:table-cell text-sm">{levelLabels[f.level] || f.level}</TableCell>
+                  <TableCell className="hidden md:table-cell text-sm">{modeLabels[f.mode] || f.mode}</TableCell>
+                  <TableCell className="hidden md:table-cell text-sm text-slate-600">{f.duration}</TableCell>
+                  <TableCell className="text-sm">{f.price ? `${f.price} MAD` : 'Sur demande'}</TableCell>
+                  <TableCell className="hidden lg:table-cell">
+                    {f.archived ? (
+                      <Badge variant="outline" className="bg-slate-100 text-slate-600 border-slate-200">Archivée</Badge>
+                    ) : (
+                      <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">Active</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">{renderFormationActions(f, 'diplomante')}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </Card>
       )}
+      {renderFormationDialog()}
+    </div>
+  );
 
-      <Dialog open={formationModalOpen} onOpenChange={setFormationModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingFormation ? 'Modifier la formation' : 'Nouvelle formation'}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
+  // ----- renderFormationsCertifiantes -----
+  const renderFormationsCertifiantes = () => (
+    <div>
+      <SectionHeader
+        title="Formations Certifiantes"
+        subtitle="Formations courtes certifiantes (Sauvetage, Habilitation, Prévention, Management)"
+        onAdd={() => openCreateFormation('certifiante')}
+      />
+
+      {certifiantesLoading ? <LoadingSkeleton /> : (
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Titre</TableHead>
+                <TableHead className="hidden md:table-cell">Catégorie</TableHead>
+                <TableHead className="hidden lg:table-cell">Mode</TableHead>
+                <TableHead className="hidden md:table-cell">Durée</TableHead>
+                <TableHead className="hidden lg:table-cell">Indiv.</TableHead>
+                <TableHead className="hidden lg:table-cell">Groupe</TableHead>
+                <TableHead className="hidden lg:table-cell">Entreprise</TableHead>
+                <TableHead className="hidden xl:table-cell">Statut</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {certifiantes.length === 0 ? (
+                <TableRow><TableCell colSpan={9} className="text-center py-8 text-slate-400">Aucune formation certifiante</TableCell></TableRow>
+              ) : certifiantes.map((f: any) => (
+                <TableRow key={f.id} className={f.archived ? 'opacity-60 bg-slate-50' : 'hover:bg-slate-50'}>
+                  <TableCell className="font-medium">
+                    {f.title}
+                    {f.featured && <Star className="inline-block h-3 w-3 ml-1 text-amber-500" />}
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell text-sm">{levelLabels[f.level] || f.level}</TableCell>
+                  <TableCell className="hidden lg:table-cell text-sm">{modeLabels[f.mode] || f.mode}</TableCell>
+                  <TableCell className="hidden md:table-cell text-sm text-slate-600">{f.duration}</TableCell>
+                  <TableCell className="hidden lg:table-cell text-sm">{f.priceIndividual || '-'}</TableCell>
+                  <TableCell className="hidden lg:table-cell text-sm">{f.priceGroup || '-'}</TableCell>
+                  <TableCell className="hidden lg:table-cell text-sm">{f.priceEnterprise || '-'}</TableCell>
+                  <TableCell className="hidden xl:table-cell">
+                    {f.archived ? (
+                      <Badge variant="outline" className="bg-slate-100 text-slate-600 border-slate-200">Archivée</Badge>
+                    ) : (
+                      <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">Active</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">{renderFormationActions(f, 'certifiante')}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+      )}
+      {renderFormationDialog()}
+    </div>
+  );
+
+  // ----- Shared Dialog (Tabs: Général / Spécifique / SEO) -----
+  const renderFormationDialog = () => (
+    <Dialog open={formationModalOpen} onOpenChange={setFormationModalOpen}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            {editingFormation
+              ? `Modifier la formation ${formationForm.type === 'certifiante' ? 'certifiante' : 'diplomante'}`
+              : `Nouvelle formation ${formationForm.type === 'certifiante' ? 'certifiante' : 'diplomante'}`}
+          </DialogTitle>
+        </DialogHeader>
+        <Tabs value={formationTab} onValueChange={(v) => setFormationTab(v as 'general' | 'specific' | 'seo')}>
+          <TabsList className="grid grid-cols-3 w-full">
+            <TabsTrigger value="general">Général</TabsTrigger>
+            <TabsTrigger value="specific">Spécifique</TabsTrigger>
+            <TabsTrigger value="seo">SEO</TabsTrigger>
+          </TabsList>
+
+          {/* ----- Général ----- */}
+          <TabsContent value="general" className="space-y-3 mt-4">
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Titre *</Label>
@@ -1331,15 +1703,30 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Niveau</Label>
-                <Select value={formationForm.level} onValueChange={(v) => setFormationForm({ ...formationForm, level: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="technicien">Technicien</SelectItem>
-                    <SelectItem value="specialise">Spécialisé</SelectItem>
-                    <SelectItem value="expert">Expert</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label>{formationForm.type === 'certifiante' ? 'Catégorie' : 'Niveau'}</Label>
+                {formationForm.type === 'certifiante' ? (
+                  <Select value={formationForm.level} onValueChange={(v) => setFormationForm({ ...formationForm, level: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="sauvetage">Sauvetage & Incendie</SelectItem>
+                      <SelectItem value="habilitation">Habilitations & CACES</SelectItem>
+                      <SelectItem value="prevention">Prévention des Risques</SelectItem>
+                      <SelectItem value="management">Management & Instances</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Select value={formationForm.level} onValueChange={(v) => setFormationForm({ ...formationForm, level: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="diplome-qualifie">Diplôme Qualifié QHSE</SelectItem>
+                      <SelectItem value="technicien">Technicien QHSE</SelectItem>
+                      <SelectItem value="technicien-superieur">Technicien Supérieur QHSE</SelectItem>
+                      <SelectItem value="licence">Licence Professionnelle QHSE</SelectItem>
+                      <SelectItem value="master">Master Professionnel QHSE</SelectItem>
+                      <SelectItem value="vae">VAE Expertise QHSE</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
               <div>
                 <Label>Mode</Label>
@@ -1347,7 +1734,7 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="presentiel">Présentiel</SelectItem>
-                    <SelectItem value="en-ligne">En ligne</SelectItem>
+                    <SelectItem value="distance">À distance</SelectItem>
                     <SelectItem value="hybride">Hybride</SelectItem>
                   </SelectContent>
                 </Select>
@@ -1356,13 +1743,37 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Durée</Label>
-                <Input value={formationForm.duration} onChange={(e) => setFormationForm({ ...formationForm, duration: e.target.value })} placeholder="ex: 3 jours, 40h..." />
+                <Input value={formationForm.duration} onChange={(e) => setFormationForm({ ...formationForm, duration: e.target.value })} placeholder="ex: 2 ans, 3 jours, 40h..." />
               </div>
-              <div>
-                <Label>Prix (MAD)</Label>
-                <Input value={formationForm.price} onChange={(e) => setFormationForm({ ...formationForm, price: e.target.value })} placeholder="Laisser vide pour gratuit" />
-              </div>
+              {formationForm.type === 'certifiante' && (
+                <div>
+                  <Label>Durée en heures (optionnel)</Label>
+                  <Input value={formationForm.durationHours} onChange={(e) => setFormationForm({ ...formationForm, durationHours: e.target.value })} placeholder="ex: 40h" />
+                </div>
+              )}
             </div>
+            {/* Prix : unique pour diplomante, 3 tarifs pour certifiante */}
+            {formationForm.type === 'certifiante' ? (
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <Label>Prix Individuel (MAD)</Label>
+                  <Input value={formationForm.priceIndividual} onChange={(e) => setFormationForm({ ...formationForm, priceIndividual: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Prix Groupe (MAD)</Label>
+                  <Input value={formationForm.priceGroup} onChange={(e) => setFormationForm({ ...formationForm, priceGroup: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Prix Entreprise (MAD)</Label>
+                  <Input value={formationForm.priceEnterprise} onChange={(e) => setFormationForm({ ...formationForm, priceEnterprise: e.target.value })} />
+                </div>
+              </div>
+            ) : (
+              <div>
+                <Label>Prix (MAD) — laisser vide si "Sur demande"</Label>
+                <Input value={formationForm.price} onChange={(e) => setFormationForm({ ...formationForm, price: e.target.value })} placeholder="ex: 5000" />
+              </div>
+            )}
             <div>
               <Label>Prérequis</Label>
               <Textarea value={formationForm.prerequisites} onChange={(e) => setFormationForm({ ...formationForm, prerequisites: e.target.value })} rows={2} />
@@ -1372,31 +1783,219 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
               <Textarea value={formationForm.objectives} onChange={(e) => setFormationForm({ ...formationForm, objectives: e.target.value })} rows={3} placeholder="Objectif 1&#10;Objectif 2" />
             </div>
             <div>
-              <Label>Programme (un par ligne)</Label>
-              <Textarea value={formationForm.program} onChange={(e) => setFormationForm({ ...formationForm, program: e.target.value })} rows={3} placeholder="Module 1&#10;Module 2" />
+              <Label>Programme (un par ligne — préfixer "  - " pour sous-item)</Label>
+              <Textarea value={formationForm.program} onChange={(e) => setFormationForm({ ...formationForm, program: e.target.value })} rows={5} placeholder="Année 1 : Fondamentaux&#10;  - Semestre 1 : ..." />
             </div>
             <div>
               <Label>Image de couverture (URL)</Label>
               <Input value={formationForm.coverImage} onChange={(e) => setFormationForm({ ...formationForm, coverImage: e.target.value })} />
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Ordre</Label>
+                <Input type="number" value={formationForm.order} onChange={(e) => setFormationForm({ ...formationForm, order: parseInt(e.target.value) || 0 })} />
+              </div>
+              <div className="flex items-center gap-4 mt-6">
+                <div className="flex items-center gap-2">
+                  <Switch checked={formationForm.featured} onCheckedChange={(v) => setFormationForm({ ...formationForm, featured: v })} />
+                  <Label>À la une</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch checked={formationForm.archived} onCheckedChange={(v) => setFormationForm({ ...formationForm, archived: v })} />
+                  <Label>Archivée</Label>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* ----- Spécifique ----- */}
+          <TabsContent value="specific" className="space-y-3 mt-4">
+            {formationForm.type === 'diplomante' ? (
+              <>
+                <div>
+                  <Label>Type de diplôme délivré</Label>
+                  <Select
+                    value={formationForm.degreeType || ''}
+                    onValueChange={(v) => setFormationForm({ ...formationForm, degreeType: v === '_custom' ? formationForm.degreeType : v })}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Diplôme d'État">Diplôme d'État</SelectItem>
+                      <SelectItem value="Titre RNCP">Titre RNCP</SelectItem>
+                      <SelectItem value="Certification professionnelle">Certification professionnelle</SelectItem>
+                      <SelectItem value="Attestation de formation">Attestation de formation</SelectItem>
+                      <SelectItem value="Diplôme d'établissement">Diplôme d'établissement</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Débouchés professionnels (métiers accessibles — un par ligne)</Label>
+                  <Textarea
+                    value={formationForm.careerOutcomes}
+                    onChange={(e) => setFormationForm({ ...formationForm, careerOutcomes: e.target.value })}
+                    rows={5}
+                    placeholder="Technicien QHSE&#10;Chargé de sécurité&#10;Animateur QHSE"
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Validité du certificat</Label>
+                    <Input
+                      value={formationForm.certificateValidity}
+                      onChange={(e) => setFormationForm({ ...formationForm, certificateValidity: e.target.value })}
+                      placeholder="ex: 24 mois, 36 mois..."
+                    />
+                  </div>
+                  <div>
+                    <Label>Préfixe du certificat</Label>
+                    <Input
+                      value={formationForm.certificatePrefix}
+                      onChange={(e) => setFormationForm({ ...formationForm, certificatePrefix: e.target.value })}
+                      placeholder="ex: SST-2025-"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label>Organisme certificateur</Label>
+                  <Input
+                    value={formationForm.certifyingBody}
+                    onChange={(e) => setFormationForm({ ...formationForm, certifyingBody: e.target.value })}
+                    placeholder="ex: CNAPS, CRAMIF, IICP..."
+                  />
+                </div>
+                <div>
+                  <Label>Public cible</Label>
+                  <Textarea
+                    value={formationForm.targetAudience}
+                    onChange={(e) => setFormationForm({ ...formationForm, targetAudience: e.target.value })}
+                    rows={3}
+                    placeholder="Tous salariés, électriciens, chefs d'équipe..."
+                  />
+                </div>
+                <div>
+                  <Label>Prérequis obligatoires (un par ligne)</Label>
+                  <Textarea
+                    value={formationForm.mandatoryPrerequisites}
+                    onChange={(e) => setFormationForm({ ...formationForm, mandatoryPrerequisites: e.target.value })}
+                    rows={3}
+                    placeholder="Aptitude médicale&#10;Avoir 18 ans révolus"
+                  />
+                </div>
+              </>
+            )}
+          </TabsContent>
+
+          {/* ----- SEO ----- */}
+          <TabsContent value="seo" className="space-y-3 mt-4">
             <div>
-              <Label>Ordre</Label>
-              <Input type="number" value={formationForm.order} onChange={(e) => setFormationForm({ ...formationForm, order: parseInt(e.target.value) || 0 })} />
+              <Label>Titre SEO ({(formationForm.seoTitle || '').length}/60)</Label>
+              <Input
+                value={formationForm.seoTitle}
+                onChange={(e) => setFormationForm({ ...formationForm, seoTitle: e.target.value })}
+                maxLength={70}
+                placeholder="Si vide, utilise le titre de la formation"
+              />
+              <p className="text-xs text-slate-500 mt-1">Affiché dans l'onglet navigateur et les résultats Google.</p>
             </div>
-            <div className="flex items-center gap-2">
-              <Switch checked={formationForm.featured} onCheckedChange={(v) => setFormationForm({ ...formationForm, featured: v })} />
-              <Label>Formation à la une</Label>
+            <div>
+              <Label>Méta description ({(formationForm.seoDescription || '').length}/160)</Label>
+              <Textarea
+                value={formationForm.seoDescription}
+                onChange={(e) => setFormationForm({ ...formationForm, seoDescription: e.target.value })}
+                rows={2}
+                maxLength={170}
+                placeholder="Si vide, utilise la courte description"
+              />
+              <p className="text-xs text-slate-500 mt-1">Description courte affichée dans les résultats de recherche.</p>
             </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setFormationModalOpen(false)}>Annuler</Button>
-            <Button onClick={handleFormationSubmit} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-              {saving ? 'Enregistrement...' : editingFormation ? 'Mettre à jour' : 'Créer'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+            <div>
+              <Label>Mots-clés (séparés par des virgules)</Label>
+              <Input
+                value={formationForm.seoKeywords}
+                onChange={(e) => setFormationForm({ ...formationForm, seoKeywords: e.target.value })}
+                placeholder="QHSE, formation, ISO 9001, ..."
+              />
+            </div>
+            <div>
+              <Label>Slug SEO (URL personnalisée)</Label>
+              <Input
+                value={formationForm.seoSlug}
+                onChange={(e) => setFormationForm({ ...formationForm, seoSlug: e.target.value })}
+                placeholder="ex: master-qhse-maroc (si vide, utilise le slug principal)"
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                URL publique : <span className="text-emerald-700 font-mono">/f/{formationForm.seoSlug || formationForm.slug || '...'}</span>
+              </p>
+            </div>
+            <div>
+              <Label>Image SEO (URL)</Label>
+              <Input
+                value={formationForm.seoImage}
+                onChange={(e) => setFormationForm({ ...formationForm, seoImage: e.target.value })}
+                placeholder="URL d'une image pour le SEO"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Robots</Label>
+                <Select value={formationForm.seoRobots} onValueChange={(v) => setFormationForm({ ...formationForm, seoRobots: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="index,follow">index,follow (par défaut)</SelectItem>
+                    <SelectItem value="noindex,follow">noindex,follow</SelectItem>
+                    <SelectItem value="index,nofollow">index,nofollow</SelectItem>
+                    <SelectItem value="noindex,nofollow">noindex,nofollow</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Canonical (URL absolue, optionnel)</Label>
+                <Input
+                  value={formationForm.seoCanonical}
+                  onChange={(e) => setFormationForm({ ...formationForm, seoCanonical: e.target.value })}
+                  placeholder="https://hseacademy.online/f/..."
+                />
+              </div>
+            </div>
+            <Separator />
+            <div>
+              <Label>OG Title (partage réseaux sociaux)</Label>
+              <Input
+                value={formationForm.seoOgTitle}
+                onChange={(e) => setFormationForm({ ...formationForm, seoOgTitle: e.target.value })}
+                placeholder="Si vide, utilise le titre SEO"
+              />
+            </div>
+            <div>
+              <Label>OG Description</Label>
+              <Textarea
+                value={formationForm.seoOgDescription}
+                onChange={(e) => setFormationForm({ ...formationForm, seoOgDescription: e.target.value })}
+                rows={2}
+                placeholder="Si vide, utilise la méta description"
+              />
+            </div>
+            <div>
+              <Label>OG Image (URL)</Label>
+              <Input
+                value={formationForm.seoOgImage}
+                onChange={(e) => setFormationForm({ ...formationForm, seoOgImage: e.target.value })}
+                placeholder="Si vide, utilise l'image SEO"
+              />
+            </div>
+          </TabsContent>
+        </Tabs>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setFormationModalOpen(false)}>Annuler</Button>
+          <Button onClick={handleFormationSubmit} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+            {saving ? 'Enregistrement...' : editingFormation ? 'Mettre à jour' : 'Créer'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 
   // ----- CATEGORIES -----
@@ -2360,6 +2959,90 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
 
   useEffect(() => { if (section === 'paymentSettings') fetchPaymentSettings(); }, [section, fetchPaymentSettings]);
 
+  // ===== Site Profile fetcher + sitemap generator =====
+  const fetchSiteProfile = useCallback(async () => {
+    setSiteProfileLoading(true);
+    try {
+      const data = await api('/api/admin/site-profile');
+      const p = data.profile || {};
+      setSiteProfileForm({
+        siteName: p.siteName || '',
+        siteLogo: p.siteLogo || '',
+        siteDescription: p.siteDescription || '',
+        siteKeywords: p.siteKeywords || '',
+        siteUrl: p.siteUrl || 'https://hseacademy.online',
+        gscVerification: p.gscVerification || '',
+        facebook: p.facebook || '',
+        twitter: p.twitter || '',
+        linkedin: p.linkedin || '',
+        instagram: p.instagram || '',
+        youtube: p.youtube || '',
+      });
+      if (p.sitemapUrl || p.sitemapUpdatedAt) {
+        setSitemapInfo({
+          sitemapUrl: p.sitemapUrl || null,
+          sitemapUpdatedAt: p.sitemapUpdatedAt || null,
+        });
+      }
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Erreur');
+    } finally {
+      setSiteProfileLoading(false);
+    }
+  }, [api]);
+
+  useEffect(() => { if (section === 'siteProfile') fetchSiteProfile(); }, [section, fetchSiteProfile]);
+
+  const saveSiteProfile = async () => {
+    setSiteProfileSaving(true);
+    try {
+      await api('/api/admin/site-profile', {
+        method: 'PUT',
+        body: JSON.stringify(siteProfileForm),
+      });
+      toast.success('Profil du site enregistré');
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Erreur');
+    } finally {
+      setSiteProfileSaving(false);
+    }
+  };
+
+  const generateSitemap = async () => {
+    setGeneratingSitemap(true);
+    try {
+      const data = await api('/api/admin/sitemap/generate', { method: 'POST' });
+      toast.success(`Sitemap généré (${data.counts.total} URLs) — Google: ${data.pingGoogle === 'ok' ? 'pingé' : 'non pingé'}`);
+      setSitemapInfo({
+        sitemapUrl: data.sitemapUrl,
+        sitemapUpdatedAt: data.generatedAt,
+        urlCount: data.counts.total,
+        pingResult: data.pingGoogle,
+      });
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Erreur génération sitemap');
+    } finally {
+      setGeneratingSitemap(false);
+    }
+  };
+
+  // ===== Stats fetcher =====
+  const fetchStats = useCallback(async (period: 'today' | '7d' | '30d' | '90d' | 'year' | 'all') => {
+    setStatsLoading(true);
+    try {
+      const data = await api(`/api/admin/stats?period=${period}`);
+      setStatsData(data);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Erreur');
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [api]);
+
+  useEffect(() => {
+    if (section === 'stats') fetchStats(statsPeriod);
+  }, [section, statsPeriod, fetchStats]);
+
   const savePaymentSettings = async () => {
     setPaymentSaving(true);
     try {
@@ -2569,6 +3252,18 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
     <div>
       <SectionHeader title="Utilisateurs" />
 
+      {/* Recherche */}
+      <div className="flex gap-2 mb-4">
+        <Input
+          placeholder="Rechercher par nom ou email..."
+          value={usersSearch}
+          onChange={(e) => { setUsersSearch(e.target.value); setUsersPage(1); }}
+          className="max-w-xs"
+          onKeyDown={(e) => { if (e.key === 'Enter') fetchUsers(); }}
+        />
+        <Button onClick={() => { setUsersPage(1); fetchUsers(); }} variant="outline">Rechercher</Button>
+      </div>
+
       {usersLoading ? <LoadingSkeleton /> : (
         <>
           <div className="text-sm text-slate-500 mb-2">{usersTotal} utilisateur(s)</div>
@@ -2576,25 +3271,34 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nom</TableHead>
+                  <TableHead className="cursor-pointer" onClick={() => { setSelectedUserId(null); }}>Nom</TableHead>
                   <TableHead className="hidden md:table-cell">Email</TableHead>
+                  <TableHead>Statut</TableHead>
                   <TableHead>Rôle</TableHead>
+                  <TableHead className="hidden md:table-cell">Wallet</TableHead>
                   <TableHead className="hidden sm:table-cell">Inscription</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {users.length === 0 ? (
-                  <TableRow><TableCell colSpan={5} className="text-center py-8 text-slate-400">Aucun utilisateur</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center py-8 text-slate-400">Aucun utilisateur</TableCell></TableRow>
                 ) : users.map((u: any) => {
                   const isRoot = !!u.isRoot;
                   return (
-                  <TableRow key={u.id} className="hover:bg-slate-50">
+                  <TableRow key={u.id} className="hover:bg-emerald-50 cursor-pointer" onClick={() => { setSelectedUserId(u.id); fetchUserDetail(u.id); changeSection('userDetail'); }}>
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
-                        {u.name}
+                        {u.avatar ? (
+                          <img src={u.avatar} alt={u.name} className="h-7 w-7 rounded-full object-cover" />
+                        ) : (
+                          <div className="h-7 w-7 rounded-full bg-emerald-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                            {u.name?.charAt(0)?.toUpperCase()}
+                          </div>
+                        )}
+                        <span>{u.name}</span>
                         {isRoot && (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300" title="Compte ROOT administrateur — protégé contre suppression et rétrogradation">
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300" title="Compte ROOT">
                             <Shield className="h-3 w-3" /> ROOT
                           </span>
                         )}
@@ -2602,12 +3306,21 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-sm text-slate-600">{u.email}</TableCell>
                     <TableCell>
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${
+                        u.status === 'active' ? 'bg-emerald-100 text-emerald-800' :
+                        u.status === 'disabled' ? 'bg-amber-100 text-amber-800' :
+                        'bg-red-100 text-red-800'
+                      }`}>
+                        {u.status === 'active' ? 'Actif' : u.status === 'disabled' ? 'Désactivé' : 'Bloqué'}
+                      </span>
+                    </TableCell>
+                    <TableCell>
                       {isRoot ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 italic px-2 py-1" title="Le rôle du compte ROOT ne peut pas être modifié">
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 italic px-2 py-1">
                           <Lock className="h-3 w-3" /> {u.role}
                         </span>
                       ) : (
-                        <Select value={u.role} onValueChange={(v) => updateUserRole(u.id, v)}>
+                        <Select value={u.role} onValueChange={(v) => updateUserRole(u.id, v)} onClick={(e) => e.stopPropagation()}>
                           <SelectTrigger className="w-28 h-8"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="user">Utilisateur</SelectItem>
@@ -2617,10 +3330,13 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
                         </Select>
                       )}
                     </TableCell>
+                    <TableCell className="hidden md:table-cell text-sm font-medium text-emerald-700">
+                      {(u.walletBalance || 0).toFixed(0)} MAD
+                    </TableCell>
                     <TableCell className="hidden sm:table-cell text-sm text-slate-500">{formatDate(u.createdAt)}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                       {isRoot ? (
-                        <span className="inline-flex items-center justify-center h-8 w-8 text-slate-300" title="Le compte ROOT ne peut pas être supprimé">
+                        <span className="inline-flex items-center justify-center h-8 w-8 text-slate-300">
                           <Lock className="h-4 w-4" />
                         </span>
                       ) : (
@@ -2638,6 +3354,391 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
       )}
     </div>
   );
+
+  // ----- USER DETAIL PAGE -----
+  const renderUserDetail = () => {
+    if (userDetailLoading || !userDetail) {
+      return (
+        <div>
+          <Button variant="ghost" onClick={() => { setSelectedUserId(null); changeSection('users'); }} className="mb-4">
+            <ChevronLeft className="h-4 w-4 mr-1" /> Retour à la liste
+          </Button>
+          {userDetailLoading ? <LoadingSkeleton /> : <p className="text-slate-400">Aucune donnée</p>}
+        </div>
+      );
+    }
+
+    const u = userDetail.user;
+    const profile = userDetail.profile;
+    const wallet = userDetail.wallet;
+    const enrollments = userDetail.enrollments || [];
+    const attestations = userDetail.attestations || [];
+    const coursePayments = userDetail.coursePayments || [];
+    const paymentRequests = userDetail.paymentRequests || [];
+    const stats = userDetail.stats || {};
+    const isRoot = !!u.isRoot;
+
+    return (
+      <div>
+        <Button variant="ghost" onClick={() => { setSelectedUserId(null); changeSection('users'); fetchUsers(); }} className="mb-4">
+          <ChevronLeft className="h-4 w-4 mr-1" /> Retour à la liste
+        </Button>
+
+        {/* Header card */}
+        <Card className="mb-6 border-emerald-200">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              {u.avatar ? (
+                <img src={u.avatar} alt={u.name} className="h-16 w-16 rounded-full object-cover" />
+              ) : (
+                <div className="h-16 w-16 rounded-full bg-emerald-600 flex items-center justify-center text-white text-2xl font-bold">{u.name?.charAt(0)?.toUpperCase()}</div>
+              )}
+              <div className="flex-1">
+                <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                  {u.name}
+                  {isRoot && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300"><Shield className="h-3 w-3" /> ROOT</span>}
+                </h2>
+                <p className="text-sm text-slate-500">{u.email} {u.phone && `• ${u.phone}`}</p>
+                <div className="flex items-center gap-3 mt-1">
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${
+                    u.status === 'active' ? 'bg-emerald-100 text-emerald-800' :
+                    u.status === 'disabled' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'
+                  }`}>
+                    {u.status === 'active' ? 'Actif' : u.status === 'disabled' ? 'Désactivé' : 'Bloqué'}
+                  </span>
+                  <span className="text-xs text-slate-400">Rôle: {u.role}</span>
+                  <span className="text-xs text-slate-400">Inscrit le: {formatDate(u.createdAt)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Stats rapides */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
+              <div className="bg-emerald-50 rounded-lg p-3">
+                <p className="text-xs text-slate-500">Wallet</p>
+                <p className="text-lg font-bold text-emerald-700">{wallet?.balance?.toFixed(0) || 0} MAD</p>
+              </div>
+              <div className="bg-blue-50 rounded-lg p-3">
+                <p className="text-xs text-slate-500">Cours suivis</p>
+                <p className="text-lg font-bold text-blue-700">{stats.coursesEnrolled || 0}</p>
+              </div>
+              <div className="bg-purple-50 rounded-lg p-3">
+                <p className="text-xs text-slate-500">Attestations</p>
+                <p className="text-lg font-bold text-purple-700">{stats.attestationsObtained || 0}</p>
+              </div>
+              <div className="bg-amber-50 rounded-lg p-3">
+                <p className="text-xs text-slate-500">Total dépensé</p>
+                <p className="text-lg font-bold text-amber-700">{(stats.totalSpent || 0).toFixed(0)} MAD</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Onglets */}
+        <div className="flex gap-2 mb-4 border-b border-slate-200 pb-2">
+          <Button variant={userDetailTab === 'info' ? 'default' : 'ghost'} size="sm" onClick={() => setUserDetailTab('info')}>Infos & Actions</Button>
+          <Button variant={userDetailTab === 'wallet' ? 'default' : 'ghost'} size="sm" onClick={() => setUserDetailTab('wallet')}>Wallet & Transactions</Button>
+          <Button variant={userDetailTab === 'formations' ? 'default' : 'ghost'} size="sm" onClick={() => setUserDetailTab('formations')}>Formations & Attestations</Button>
+          <Button variant={userDetailTab === 'payments' ? 'default' : 'ghost'} size="sm" onClick={() => setUserDetailTab('payments')}>Paiements</Button>
+        </div>
+
+        {/* Onglet INFO */}
+        {userDetailTab === 'info' && (
+          <div className="space-y-6">
+            {/* Profil */}
+            <Card>
+              <CardHeader><CardTitle className="text-base">Profil</CardTitle></CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <div className="flex justify-between"><span className="text-slate-500">Nom complet</span><span className="font-medium">{profile?.fullName || u.name}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Username</span><span className="font-medium">{profile?.username || '—'}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">CV public</span><span className="font-medium">{profile?.profilePublic ? 'Oui' : 'Non'}</span></div>
+                {profile?.username && <div className="flex justify-between"><span className="text-slate-500">Lien CV</span><a href={`https://hseacademy.online/@${profile.username}`} target="_blank" className="text-emerald-600 hover:underline">/@{profile.username}</a></div>}
+                <div className="flex justify-between"><span className="text-slate-500">Email vérifié</span><span className="font-medium">{profile?.emailVerified ? 'Oui' : 'Non'}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Téléphone vérifié</span><span className="font-medium">{profile?.phoneVerified ? 'Oui' : 'Non'}</span></div>
+                {profile?.birthDate && <div className="flex justify-between"><span className="text-slate-500">Date de naissance</span><span className="font-medium">{new Date(profile.birthDate).toLocaleDateString('fr-FR')}</span></div>}
+              </CardContent>
+            </Card>
+
+            {/* Statut */}
+            <Card>
+              <CardHeader><CardTitle className="text-base">Statut du compte</CardTitle></CardHeader>
+              <CardContent>
+                {isRoot ? (
+                  <p className="text-sm text-slate-400 italic">Le statut du compte ROOT ne peut pas être modifié.</p>
+                ) : (
+                  <div className="flex gap-2">
+                    <Button size="sm" variant={u.status === 'active' ? 'default' : 'outline'} onClick={() => updateUserStatus(u.id, 'active')} className={u.status === 'active' ? 'bg-emerald-600 text-white' : ''}>Activer</Button>
+                    <Button size="sm" variant={u.status === 'disabled' ? 'default' : 'outline'} onClick={() => updateUserStatus(u.id, 'disabled')} className={u.status === 'disabled' ? 'bg-amber-600 text-white' : ''}>Désactiver</Button>
+                    <Button size="sm" variant={u.status === 'blocked' ? 'default' : 'outline'} onClick={() => updateUserStatus(u.id, 'blocked')} className={u.status === 'blocked' ? 'bg-red-600 text-white' : ''}>Bloquer</Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Reset password */}
+            <Card>
+              <CardHeader><CardTitle className="text-base">Réinitialiser le mot de passe</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-xs text-slate-500">L'ancien mot de passe n'est pas visible. Saisissez un nouveau mot de passe (min 6 caractères).</p>
+                <div className="flex gap-2">
+                  <Input type="text" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Nouveau mot de passe" className="max-w-xs" />
+                  <Button size="sm" onClick={() => resetPassword(u.id)} disabled={savingUser || !newPassword}>
+                    {savingUser ? 'Enregistrement...' : 'Réinitialiser'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Change username */}
+            <Card>
+              <CardHeader><CardTitle className="text-base">Modifier le username (lien CV public)</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-xs text-slate-500">L'admin peut utiliser n'importe quel username (bypass liste réservés).</p>
+                <div className="flex gap-2">
+                  <Input value={newUsername} onChange={(e) => setNewUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))} placeholder="username" maxLength={12} className="max-w-xs" />
+                  <Button size="sm" onClick={() => changeUsername(u.id)} disabled={savingUser || !newUsername}>
+                    {savingUser ? 'Enregistrement...' : 'Modifier'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Onglet WALLET */}
+        {userDetailTab === 'wallet' && (
+          <div className="space-y-4">
+            <Card>
+              <CardHeader><CardTitle className="text-base">Solde du Wallet</CardTitle></CardHeader>
+              <CardContent>
+                <div className="flex justify-between items-center">
+                  <span className="text-2xl font-bold text-emerald-700">{wallet?.balance?.toFixed(2) || '0.00'} MAD</span>
+                  <div className="text-sm text-slate-500">
+                    Total rechargé: <span className="font-medium text-emerald-600">{(stats.totalCharged || 0).toFixed(0)} MAD</span>
+                    <span className="mx-2">•</span>
+                    Total dépensé: <span className="font-medium text-red-600">{(stats.totalSpent || 0).toFixed(0)} MAD</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle className="text-base">Historique des transactions</CardTitle></CardHeader>
+              <CardContent>
+                {wallet?.transactions?.length ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Montant</TableHead>
+                        <TableHead className="hidden sm:table-cell">Description</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {wallet.transactions.map((t: any) => (
+                        <TableRow key={t.id}>
+                          <TableCell className="text-sm text-slate-500">{formatDate(t.createdAt)}</TableCell>
+                          <TableCell>
+                            <span className={`text-xs px-2 py-0.5 rounded ${
+                              t.type === 'charge' || t.type === 'bonus' ? 'bg-emerald-100 text-emerald-800' :
+                              t.type === 'purchase' ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-700'
+                            }`}>
+                              {t.type === 'charge' ? 'Rechargement' : t.type === 'bonus' ? 'Bonus' : t.type === 'purchase' ? 'Achat' : t.type}
+                            </span>
+                          </TableCell>
+                          <TableCell className="font-medium">{t.amount.toFixed(0)} MAD</TableCell>
+                          <TableCell className="hidden sm:table-cell text-sm text-slate-500">{t.description}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <p className="text-center py-6 text-slate-400">Aucune transaction</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Onglet FORMATIONS */}
+        {userDetailTab === 'formations' && (
+          <div className="space-y-4">
+            <Card>
+              <CardHeader><CardTitle className="text-base">Formations suivies ({enrollments.length})</CardTitle></CardHeader>
+              <CardContent>
+                {enrollments.length ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Cours</TableHead>
+                        <TableHead className="hidden sm:table-cell">Niveau</TableHead>
+                        <TableHead>Progression</TableHead>
+                        <TableHead className="hidden sm:table-cell">Paiement</TableHead>
+                        <TableHead>Statut</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {enrollments.map((e: any) => {
+                        const pct = e.course?.totalChapters ? Math.round(((JSON.parse(e.completedChapters || '[]').length) / e.course.totalChapters) * 100) : 0;
+                        return (
+                          <TableRow key={e.id}>
+                            <TableCell className="font-medium text-sm">{e.course?.title || '—'}</TableCell>
+                            <TableCell className="hidden sm:table-cell text-sm text-slate-500">{e.course?.level}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Progress value={pct} className="h-2 w-16" />
+                                <span className="text-xs text-slate-500">{pct}%</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="hidden sm:table-cell">
+                              <span className={`text-xs px-2 py-0.5 rounded ${
+                                e.paymentStatus === 'validated' ? 'bg-emerald-100 text-emerald-800' :
+                                e.paymentStatus === 'not_required' ? 'bg-slate-100 text-slate-600' :
+                                e.paymentStatus === 'pending' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'
+                              }`}>
+                                {e.paymentStatus === 'validated' ? 'Payé' : e.paymentStatus === 'not_required' ? 'Gratuit' : e.paymentStatus === 'pending' ? 'En attente' : e.paymentStatus}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <span className={`text-xs ${e.status === 'completed' ? 'text-emerald-600' : 'text-slate-500'}`}>
+                                {e.status === 'completed' ? 'Terminé' : 'En cours'}
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <p className="text-center py-6 text-slate-400">Aucune formation</p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle className="text-base">Attestations obtenues ({attestations.length})</CardTitle></CardHeader>
+              <CardContent>
+                {attestations.length ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Cours</TableHead>
+                        <TableHead>Score</TableHead>
+                        <TableHead className="hidden sm:table-cell">N° Série</TableHead>
+                        <TableHead className="hidden sm:table-cell">Date</TableHead>
+                        <TableHead>Statut</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {attestations.map((a: any) => (
+                        <TableRow key={a.id}>
+                          <TableCell className="font-medium text-sm">{a.courseName}</TableCell>
+                          <TableCell className="text-sm">{a.overallScore}%</TableCell>
+                          <TableCell className="hidden sm:table-cell text-xs text-slate-500">{a.serialNumber}</TableCell>
+                          <TableCell className="hidden sm:table-cell text-sm text-slate-500">{formatDate(a.issuedDate)}</TableCell>
+                          <TableCell>
+                            <span className={`text-xs px-2 py-0.5 rounded ${a.status === 'valid' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
+                              {a.status === 'valid' ? 'Valide' : 'Révoquée'}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <p className="text-center py-6 text-slate-400">Aucune attestation</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Onglet PAIEMENTS */}
+        {userDetailTab === 'payments' && (
+          <div className="space-y-4">
+            <Card>
+              <CardHeader><CardTitle className="text-base">Paiements de cours ({coursePayments.length})</CardTitle></CardHeader>
+              <CardContent>
+                {coursePayments.length ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Montant</TableHead>
+                        <TableHead>Méthode</TableHead>
+                        <TableHead>Statut</TableHead>
+                        <TableHead className="hidden sm:table-cell">Date</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {coursePayments.map((p: any) => (
+                        <TableRow key={p.id}>
+                          <TableCell className="font-medium">{p.amount.toFixed(0)} MAD</TableCell>
+                          <TableCell className="text-sm">{p.method === 'wallet' ? 'Wallet' : p.method === 'paypal' ? 'PayPal' : p.method === 'bank_transfer' ? 'Virement' : p.method}</TableCell>
+                          <TableCell>
+                            <span className={`text-xs px-2 py-0.5 rounded ${
+                              p.status === 'validated' ? 'bg-emerald-100 text-emerald-800' :
+                              p.status === 'pending' ? 'bg-amber-100 text-amber-800' :
+                              p.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-600'
+                            }`}>
+                              {p.status === 'validated' ? 'Validé' : p.status === 'pending' ? 'En attente' : p.status === 'rejected' ? 'Refusé' : p.status}
+                            </span>
+                          </TableCell>
+                          <TableCell className="hidden sm:table-cell text-sm text-slate-500">{formatDate(p.createdAt)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <p className="text-center py-6 text-slate-400">Aucun paiement</p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle className="text-base">Demandes de rechargement ({paymentRequests.length})</CardTitle></CardHeader>
+              <CardContent>
+                {paymentRequests.length ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Montant</TableHead>
+                        <TableHead>Méthode</TableHead>
+                        <TableHead>Statut</TableHead>
+                        <TableHead className="hidden sm:table-cell">Date</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paymentRequests.map((r: any) => (
+                        <TableRow key={r.id}>
+                          <TableCell className="font-medium">{r.amount.toFixed(0)} MAD</TableCell>
+                          <TableCell className="text-sm">{r.method === 'paypal' ? 'PayPal' : r.method === 'bank_transfer' ? 'Virement' : r.method}</TableCell>
+                          <TableCell>
+                            <span className={`text-xs px-2 py-0.5 rounded ${
+                              r.reqStatus === 'validated' ? 'bg-emerald-100 text-emerald-800' :
+                              r.reqStatus === 'pending' ? 'bg-slate-100 text-slate-600' :
+                              r.reqStatus === 'submitted' ? 'bg-amber-100 text-amber-800' :
+                              'bg-red-100 text-red-800'
+                            }`}>
+                              {r.reqStatus === 'validated' ? 'Validé' : r.reqStatus === 'pending' ? 'En attente' : r.reqStatus === 'submitted' ? 'Soumis' : 'Refusé'}
+                            </span>
+                          </TableCell>
+                          <TableCell className="hidden sm:table-cell text-sm text-slate-500">{formatDate(r.createdAt)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <p className="text-center py-6 text-slate-400">Aucune demande</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </div>
+    );
+  };
+
 
   // ----- TESTIMONIALS -----
   const handleTestiSubmit = async () => {
@@ -3264,12 +4365,434 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
     );
   };
 
+  // ============================================================
+  // RENDER: SITE PROFILE
+  // ============================================================
+  const renderSiteProfile = () => {
+    if (siteProfileLoading) {
+      return (
+        <div>
+          <h2 className="text-xl font-semibold mb-4">Profil du Site</h2>
+          <div className="space-y-4">
+            <Skeleton className="h-12 rounded-lg" />
+            <Skeleton className="h-12 rounded-lg" />
+            <Skeleton className="h-12 rounded-lg" />
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div>
+        <div className="flex items-center gap-3 mb-6">
+          <Settings className="h-6 w-6 text-emerald-600" />
+          <div>
+            <h2 className="text-xl font-semibold">Profil du Site</h2>
+            <p className="text-sm text-muted-foreground">
+              Informations affichées publiquement sur le site et dans le JSON-LD Organization.
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-6 max-w-4xl">
+          {/* Carte: Identité */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Identité du site</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="site-name">Nom du site</Label>
+                <Input
+                  id="site-name"
+                  value={siteProfileForm.siteName}
+                  onChange={(e) => setSiteProfileForm({ ...siteProfileForm, siteName: e.target.value })}
+                  placeholder="HSE Academy"
+                />
+              </div>
+              <div>
+                <Label htmlFor="site-logo">Logo / miniature (URL)</Label>
+                <Input
+                  id="site-logo"
+                  value={siteProfileForm.siteLogo}
+                  onChange={(e) => setSiteProfileForm({ ...siteProfileForm, siteLogo: e.target.value })}
+                  placeholder="https://hseacademy.online/logo.png"
+                />
+                {siteProfileForm.siteLogo && (
+                  <div className="mt-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={siteProfileForm.siteLogo} alt="Logo" className="h-12 w-auto rounded border border-slate-200" />
+                  </div>
+                )}
+              </div>
+              <div className="md:col-span-2">
+                <Label htmlFor="site-description">Description courte (meta description par défaut)</Label>
+                <Textarea
+                  id="site-description"
+                  value={siteProfileForm.siteDescription}
+                  onChange={(e) => setSiteProfileForm({ ...siteProfileForm, siteDescription: e.target.value })}
+                  rows={3}
+                  placeholder="L'IICP propose des formations professionnelles diplômantes en Qualité, Hygiène, Sécurité et Environnement."
+                />
+                <p className="text-xs text-slate-500 mt-1">{(siteProfileForm.siteDescription || '').length} caractères — Google affiche environ 160 caractères.</p>
+              </div>
+              <div className="md:col-span-2">
+                <Label htmlFor="site-keywords">Mots-clés SEO globaux (séparés par des virgules)</Label>
+                <Input
+                  id="site-keywords"
+                  value={siteProfileForm.siteKeywords}
+                  onChange={(e) => setSiteProfileForm({ ...siteProfileForm, siteKeywords: e.target.value })}
+                  placeholder="QHSE, formation QHSE, ISO 9001, ..."
+                />
+              </div>
+              <div>
+                <Label htmlFor="site-url">URL canonique</Label>
+                <Input
+                  id="site-url"
+                  value={siteProfileForm.siteUrl}
+                  onChange={(e) => setSiteProfileForm({ ...siteProfileForm, siteUrl: e.target.value })}
+                  placeholder="https://hseacademy.online"
+                />
+              </div>
+              <div>
+                <Label htmlFor="gsc">Google Search Console (ID de vérification)</Label>
+                <Input
+                  id="gsc"
+                  value={siteProfileForm.gscVerification}
+                  onChange={(e) => setSiteProfileForm({ ...siteProfileForm, gscVerification: e.target.value })}
+                  placeholder="ex: google-site-verification=..."
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Carte: Réseaux sociaux */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Link2 className="h-4 w-4" /> Réseaux sociaux (JSON-LD Organization)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="social-facebook">Facebook</Label>
+                <Input
+                  id="social-facebook"
+                  value={siteProfileForm.facebook}
+                  onChange={(e) => setSiteProfileForm({ ...siteProfileForm, facebook: e.target.value })}
+                  placeholder="https://facebook.com/hseacademy"
+                />
+              </div>
+              <div>
+                <Label htmlFor="social-twitter">Twitter / X</Label>
+                <Input
+                  id="social-twitter"
+                  value={siteProfileForm.twitter}
+                  onChange={(e) => setSiteProfileForm({ ...siteProfileForm, twitter: e.target.value })}
+                  placeholder="https://twitter.com/hseacademy"
+                />
+              </div>
+              <div>
+                <Label htmlFor="social-linkedin">LinkedIn</Label>
+                <Input
+                  id="social-linkedin"
+                  value={siteProfileForm.linkedin}
+                  onChange={(e) => setSiteProfileForm({ ...siteProfileForm, linkedin: e.target.value })}
+                  placeholder="https://linkedin.com/company/hseacademy"
+                />
+              </div>
+              <div>
+                <Label htmlFor="social-instagram">Instagram</Label>
+                <Input
+                  id="social-instagram"
+                  value={siteProfileForm.instagram}
+                  onChange={(e) => setSiteProfileForm({ ...siteProfileForm, instagram: e.target.value })}
+                  placeholder="https://instagram.com/hseacademy"
+                />
+              </div>
+              <div>
+                <Label htmlFor="social-youtube">YouTube</Label>
+                <Input
+                  id="social-youtube"
+                  value={siteProfileForm.youtube}
+                  onChange={(e) => setSiteProfileForm({ ...siteProfileForm, youtube: e.target.value })}
+                  placeholder="https://youtube.com/@hseacademy"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Carte: Sitemap */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Globe className="h-4 w-4" /> Sitemap XML
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {sitemapInfo?.sitemapUrl && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 space-y-1">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Globe className="h-4 w-4 text-emerald-600" />
+                    <span className="font-mono text-emerald-800">{sitemapInfo.sitemapUrl}</span>
+                  </div>
+                  {sitemapInfo.sitemapUpdatedAt && (
+                    <p className="text-xs text-emerald-700 ml-6">
+                      Dernière génération : {new Date(sitemapInfo.sitemapUpdatedAt).toLocaleString('fr-FR')}
+                      {sitemapInfo.urlCount ? ` — ${sitemapInfo.urlCount} URLs` : ''}
+                    </p>
+                  )}
+                </div>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={generateSitemap} disabled={generatingSitemap} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                  {generatingSitemap ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Génération...</> : <><RefreshCw className="h-4 w-4 mr-2" /> Mettre à jour le sitemap</>}
+                </Button>
+                {sitemapInfo?.sitemapUrl && (
+                  <a href={sitemapInfo.sitemapUrl} target="_blank" rel="noopener noreferrer">
+                    <Button variant="outline">
+                      <ExternalLink className="h-4 w-4 mr-2" /> Voir le sitemap
+                    </Button>
+                  </a>
+                )}
+              </div>
+              <div className="text-xs text-slate-500 space-y-1">
+                <p>• Le sitemap référence toutes les URLs indexables : pages SEO, formations, articles, CV publics.</p>
+                <p>• Ping automatique à Google Search Console à chaque génération.</p>
+                <p>• Format : sitemap index → sitemap-pages.xml + sitemap-formations.xml + sitemap-articles.xml + sitemap-static.xml.</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Save button */}
+          <div className="flex justify-end">
+            <Button onClick={saveSiteProfile} disabled={siteProfileSaving} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+              {siteProfileSaving ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Enregistrement...</> : <><Save className="h-4 w-4 mr-2" /> Enregistrer le profil</>}
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ============================================================
+  // RENDER: STATS
+  // ============================================================
+  const renderStats = () => {
+    if (statsLoading && !statsData) {
+      return (
+        <div>
+          <h2 className="text-xl font-semibold mb-4">Statistiques</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            {[0, 1, 2, 3].map(i => <Skeleton key={i} className="h-24 rounded-lg" />)}
+          </div>
+          <Skeleton className="h-64 rounded-lg" />
+        </div>
+      );
+    }
+
+    const cards = statsData?.cards || { today: 0, week: 0, month: 0, allTime: 0 };
+    const daily = statsData?.daily || [];
+    const topPages = statsData?.topPages || [];
+    const topCountries = statsData?.topCountries || [];
+    const topSources = statsData?.topSources || [];
+    const uniqueVisitors = statsData?.uniqueVisitors || 0;
+    const totalVisits = statsData?.totalVisits || 0;
+
+    // Compute max for the chart
+    const maxDaily = Math.max(1, ...daily.map((d: any) => d.count));
+
+    // Format date for daily chart
+    const formatDate = (dateStr: string) => {
+      const d = new Date(dateStr);
+      return `${d.getDate()}/${d.getMonth() + 1}`;
+    };
+
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <BarChart2 className="h-6 w-6 text-emerald-600" />
+            <div>
+              <h2 className="text-xl font-semibold">Statistiques de visite</h2>
+              <p className="text-sm text-muted-foreground">
+                Visites, visiteurs uniques, pages populaires, origines et pays.
+              </p>
+            </div>
+          </div>
+          <Select value={statsPeriod} onValueChange={(v) => setStatsPeriod(v as 'today' | '7d' | '30d' | '90d' | 'year' | 'all')}>
+            <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="today">Aujourd'hui</SelectItem>
+              <SelectItem value="7d">7 derniers jours</SelectItem>
+              <SelectItem value="30d">30 derniers jours</SelectItem>
+              <SelectItem value="90d">90 derniers jours</SelectItem>
+              <SelectItem value="year">Année en cours</SelectItem>
+              <SelectItem value="all">Tout (all-time)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* 4 cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <Card className="border-emerald-200 bg-emerald-50/30">
+            <CardContent className="p-4">
+              <div className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Aujourd'hui</div>
+              <div className="text-3xl font-bold text-emerald-900 mt-1">{cards.today}</div>
+              <div className="text-xs text-emerald-600 mt-1">visites</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">7 jours</div>
+              <div className="text-3xl font-bold text-slate-900 mt-1">{cards.week}</div>
+              <div className="text-xs text-slate-500 mt-1">visites</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">30 jours</div>
+              <div className="text-3xl font-bold text-slate-900 mt-1">{cards.month}</div>
+              <div className="text-xs text-slate-500 mt-1">visites</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">All-time</div>
+              <div className="text-3xl font-bold text-slate-900 mt-1">{cards.allTime}</div>
+              <div className="text-xs text-slate-500 mt-1">visites totales</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Period stats summary */}
+        <div className="mb-4 text-sm text-slate-600">
+          <span className="font-semibold">{totalVisits}</span> visites pour la période sélectionnée — <span className="font-semibold">{uniqueVisitors}</span> visiteurs uniques
+        </div>
+
+        {/* 30-day chart (SVG bar chart) */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" /> Visites des 30 derniers jours
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-end gap-1 h-48 overflow-x-auto pb-2">
+              {daily.map((d: any, i: number) => {
+                const heightPct = (d.count / maxDaily) * 100;
+                return (
+                  <div key={i} className="flex flex-col items-center gap-1 flex-1 min-w-[16px]">
+                    <div className="text-[10px] text-slate-500">{d.count > 0 ? d.count : ''}</div>
+                    <div
+                      className="w-full bg-emerald-500 hover:bg-emerald-600 transition-colors rounded-t"
+                      style={{ height: `${Math.max(2, heightPct)}%` }}
+                      title={`${d.date}: ${d.count} visite(s)`}
+                    />
+                    <div className="text-[9px] text-slate-400 -rotate-45 origin-bottom whitespace-nowrap">
+                      {i % 5 === 0 ? formatDate(d.date) : ''}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 3 columns: Top pages, Top pays, Top sources */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Top pages */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <FileText className="h-4 w-4" /> Top 10 pages
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {topPages.length === 0 ? (
+                <p className="text-sm text-slate-500 text-center py-4">Aucune visite</p>
+              ) : (
+                <div className="space-y-2">
+                  {topPages.map((p: any, i: number) => (
+                    <div key={i} className="flex items-center justify-between text-sm">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-mono text-xs truncate text-slate-700">{p.path}</div>
+                        <div className="text-xs text-slate-400">{p.pageType}</div>
+                      </div>
+                      <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 ml-2">{p.count}</Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Top pays */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <MapPin className="h-4 w-4" /> Top 5 pays
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {topCountries.length === 0 ? (
+                <p className="text-sm text-slate-500 text-center py-4">Aucune donnée</p>
+              ) : (
+                <div className="space-y-2">
+                  {topCountries.map((c: any, i: number) => (
+                    <div key={i} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        {c.countryCode && <span className="text-xs font-mono bg-slate-100 px-1.5 py-0.5 rounded">{c.countryCode}</span>}
+                        <span className="text-slate-700">{c.country}</span>
+                      </div>
+                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 ml-2">{c.count}</Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Top sources */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Link2 className="h-4 w-4" /> Top 5 origines
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {topSources.length === 0 ? (
+                <p className="text-sm text-slate-500 text-center py-4">Aucune donnée</p>
+              ) : (
+                <div className="space-y-2">
+                  {topSources.map((s: any, i: number) => (
+                    <div key={i} className="flex items-center justify-between text-sm">
+                      <span className="text-slate-700 capitalize">{s.source || 'inconnu'}</span>
+                      <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 ml-2">{s.count}</Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Period reload button */}
+        <div className="mt-6 flex justify-end">
+          <Button onClick={() => fetchStats(statsPeriod)} variant="outline" disabled={statsLoading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${statsLoading ? 'animate-spin' : ''}`} /> Actualiser
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
   const renderSection = () => {
     switch (section) {
       case 'dashboard': return renderDashboard();
       case 'articles': return renderArticles();
       case 'certifications': return renderCertifications();
-      case 'formations': return renderFormations();
+      case 'formationsDiplomantes': return renderFormationsDiplomantes();
+      case 'formationsCertifiantes': return renderFormationsCertifiantes();
       case 'categories': return renderCategories();
       case 'pages': return renderPages();
       case 'menus': return renderMenus();
@@ -3277,10 +4800,13 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
       case 'newsletter': return renderNewsletter();
       case 'contacts': return renderMessages();
       case 'users': return renderUsers();
+      case 'userDetail': return renderUserDetail();
       case 'payments': return renderPayments();
       case 'testimonials': return renderTestimonials();
       case 'legal': return renderLegal();
       case 'paymentSettings': return renderPaymentSettings();
+      case 'siteProfile': return renderSiteProfile();
+      case 'stats': return renderStats();
       default: return null;
     }
   };

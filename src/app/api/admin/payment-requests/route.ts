@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
+import { COURSE_PRICE_MAD, CURRENCY, canIssueAttestation } from '@/lib/payment';
 
 // ============================================================================
 // GET /api/admin/payment-requests — Lister les demandes SOUMISES (admin only)
@@ -118,6 +119,85 @@ export async function PATCH(request: NextRequest) {
               amount: bonus,
               description: `Bonus de ${bonus} MAD (rechargement ≥ ${req.amount >= 1000 ? '1000' : '500'} MAD)`,
             },
+          });
+        }
+
+        // ====================================================================
+        // AUTOMATISATION : Après crédit du wallet, vérifier si l'utilisateur a
+        // des cours terminés en attente de paiement. Si le solde est suffisant,
+        // déduire automatiquement le montant et valider le paiement du cours.
+        // ====================================================================
+        const pendingEnrollments = await db.enrollment.findMany({
+          where: {
+            userId: req.userId,
+            paymentStatus: { in: ['pending', 'submitted', 'rejected'] },
+            courseOrderIndex: { gt: 1 },
+          },
+          include: { course: { select: { title: true } } },
+        });
+
+        for (const enrollment of pendingEnrollments) {
+          // Re-vérifier le solde à chaque itération (au cas où plusieurs cours)
+          const currentWallet = await db.wallet.findUnique({ where: { userId: req.userId } });
+          if (!currentWallet || currentWallet.balance < COURSE_PRICE_MAD) break;
+
+          // Vérifier qu'aucun CoursePayment validé n'existe déjà (anti-double-paiement)
+          const existingPayment = await db.coursePayment.findUnique({
+            where: { enrollmentId: enrollment.id },
+          });
+          if (existingPayment && existingPayment.status === 'validated') continue;
+
+          // Déduire le montant du wallet
+          const balanceAfterDeduction = currentWallet.balance - COURSE_PRICE_MAD;
+          await db.wallet.update({
+            where: { id: currentWallet.id },
+            data: { balance: balanceAfterDeduction },
+          });
+
+          // Créer la transaction wallet
+          await db.walletTransaction.create({
+            data: {
+              walletId: currentWallet.id,
+              type: 'purchase',
+              amount: COURSE_PRICE_MAD,
+              description: `Paiement automatique cours : ${enrollment.course.title} (après rechargement validé)`,
+            },
+          });
+
+          // Créer ou mettre à jour le CoursePayment
+          if (existingPayment) {
+            await db.coursePayment.update({
+              where: { enrollmentId: enrollment.id },
+              data: {
+                method: 'wallet',
+                status: 'validated',
+                amount: COURSE_PRICE_MAD,
+                currency: CURRENCY,
+                validatedAt: new Date(),
+                validatedBy: 'wallet-auto',
+                rejectionReason: null,
+              },
+            });
+          } else {
+            await db.coursePayment.create({
+              data: {
+                userId: req.userId,
+                enrollmentId: enrollment.id,
+                courseId: enrollment.courseId,
+                amount: COURSE_PRICE_MAD,
+                currency: CURRENCY,
+                method: 'wallet',
+                status: 'validated',
+                validatedAt: new Date(),
+                validatedBy: 'wallet-auto',
+              },
+            });
+          }
+
+          // Valider l'enrollment
+          await db.enrollment.update({
+            where: { id: enrollment.id },
+            data: { paymentStatus: 'validated' },
           });
         }
       }

@@ -20,7 +20,7 @@ import { toast } from 'sonner';
 import {
   Mail, Phone, Shield, ShieldCheck, ShieldAlert, Lock, User, Calendar,
   MapPin, Home, Facebook, Linkedin, Twitter, Globe, Award, Play,
-  FileCheck, ExternalLink, Loader2, CheckCircle, BookOpen, Wallet, Upload, Trash2,
+  FileCheck, ExternalLink, Loader2, CheckCircle, BookOpen, Wallet, Upload, Trash2, AlertTriangle, FileText, Palette, Clock,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { isReservedUsername } from '@/lib/reserved-usernames';
+import CVSections from '@/components/cv-sections';
 import { Separator } from '@/components/ui/separator';
 import {
   Card, CardContent, CardHeader, CardTitle, CardDescription,
@@ -254,6 +256,15 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
   const [validatingName, setValidatingName] = useState(false);
   const [savingSocial, setSavingSocial] = useState(false);
   const [sendingVerification, setSendingVerification] = useState(false);
+  const [countdown, setCountdown] = useState(0); // Cooldown "Renvoyer" (60s)
+
+  // Countdown timer pour le bouton "Renvoyer" (60 secondes)
+  useEffect(() => {
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [countdown]);
 
   // ---- Fetch /api/profile ----
   const fetchProfile = useCallback(async () => {
@@ -511,13 +522,19 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
   const handleSaveAllCV = async () => {
     setSavingSocial(true);
     try {
-      // 1. Save username si modifié
+      // 1. Save username si modifié (avec validation liste réservés)
       if (usernameValue.length >= 5) {
-        await fetch('/api/profile/username', {
+        const usernameRes = await fetch('/api/profile/username', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username: usernameValue }),
         });
+        if (!usernameRes.ok) {
+          const data = await usernameRes.json().catch(() => ({}));
+          toast.error(data.error || 'Échec de l\'enregistrement du username');
+          setSavingSocial(false);
+          return;
+        }
       }
       // 2. Save CV fields
       await fetch('/api/profile/username', {
@@ -646,9 +663,9 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
       const json = await r.json().catch(() => ({}));
       if (r.ok && json?.success) {
         toast.success('Email envoyé', {
-          description:
-            'Un email de vérification vient de vous être envoyé. Pensez à vérifier vos spams.',
+          description: 'Un email contenant un lien de vérification vient de vous être envoyé. Ouvrez l\'email et cliquez sur le bouton « Vérifier mon email ». Le lien est valide 24 heures. Pensez à vérifier vos spams.',
         });
+        setCountdown(60);
       } else {
         toast.error('Envoi impossible', {
           description: json?.error || 'Veuillez réessayer dans quelques instants.',
@@ -913,12 +930,16 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
                   <Button
                     type="button"
                     onClick={handleSendVerification}
-                    disabled={emailVerified || sendingVerification}
+                    disabled={emailVerified || sendingVerification || countdown > 0}
                     className="bg-emerald-600 hover:bg-emerald-700 text-white"
                   >
                     {sendingVerification ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" /> Envoi…
+                      </>
+                    ) : countdown > 0 ? (
+                      <>
+                        <Clock className="h-4 w-4" /> Renvoyer dans {countdown}s
                       </>
                     ) : (
                       <>
@@ -935,6 +956,19 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
                     Déconnexion
                   </Button>
                 </div>
+
+                {/* Message d'information : vérification par lien uniquement */}
+                {!emailVerified && countdown > 0 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3">
+                    <Mail className="h-4 w-4 text-amber-700 mt-0.5 shrink-0" />
+                    <div className="text-xs text-amber-800">
+                      <p className="font-medium">Email envoyé. Vérifiez votre boîte de réception (et vos spams).</p>
+                      <p className="mt-1 text-amber-700">
+                        Ouvrez l&apos;email et cliquez sur le bouton <span className="font-semibold">« Vérifier mon email »</span> pour activer votre compte. Le lien est valide 24 heures.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {emailVerified && (
                   <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md p-3 flex items-start gap-2">
@@ -1085,7 +1119,10 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
           {/* ============================ C: Mon CV ============================ */}
           <TabsContent value="cv" className="mt-6">
             <div className="space-y-6">
-              {/* Photo de profil */}
+
+              {/* ============================================================ */}
+              {/* CARD 1 — Photo de profil (inchangée) */}
+              {/* ============================================================ */}
               <Card className="border-slate-200 shadow-sm">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-emerald-700">
@@ -1118,25 +1155,59 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
                 </CardContent>
               </Card>
 
-              {/* CV Public */}
+              {/* ============================================================ */}
+              {/* CARD 2 — CV public (URL publique + statut de publication) */}
+              {/* ============================================================ */}
               <Card className="border-emerald-200 shadow-sm">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-emerald-700">
-                    <Globe className="h-5 w-5" /> CV Professionnel Public
+                    <Globe className="h-5 w-5" /> CV public
                   </CardTitle>
                   <CardDescription>
                     Votre CV professionnel partageable sur les réseaux sociaux.
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-5">
+                <CardContent className="space-y-4">
                   {/* Username */}
                   <div>
                     <Label htmlFor="username">Lien public de votre CV</Label>
                     <div className="flex items-center mt-1">
                       <span className="text-sm text-slate-400 bg-slate-100 border border-r-0 border-slate-200 rounded-l-md px-3 py-2">hseacademy.online/@</span>
-                      <Input id="username" value={usernameValue} onChange={(e) => setUsernameValue(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))} placeholder="akaprod" maxLength={12} className="rounded-l-none" />
+                      <Input
+                        id="username"
+                        value={usernameValue}
+                        onChange={(e) => setUsernameValue(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                        placeholder="votre-user"
+                        maxLength={12}
+                        className={`rounded-l-none ${
+                          usernameValue.length >= 5 && isReservedUsername(usernameValue) && user?.role !== 'admin'
+                            ? 'border-red-300 focus:border-red-500'
+                            : ''
+                        }`}
+                      />
                     </div>
-                    <p className="text-xs text-slate-400 mt-1">5 à 12 caractères, lettres, chiffres et _ uniquement.</p>
+                    {usernameValue.length >= 5 && isReservedUsername(usernameValue) && user?.role !== 'admin' ? (
+                      <p className="text-xs text-red-600 mt-1 flex items-start gap-1">
+                        <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                        <span>Ce nom est réservé et ne peut pas être utilisé.{' '}
+                          <a href="/contact" className="text-red-700 underline">Contactez l'administration</a>{' '}
+                          pour une demande d'exception.
+                        </span>
+                      </p>
+                    ) : (
+                      <p className="text-xs text-slate-400 mt-1">5 à 12 caractères, lettres, chiffres et _ uniquement.</p>
+                    )}
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Certains noms sont réservés (directeur, manager, iso9001, hse, admin, etc.) — si le vôtre est refusé,{' '}
+                      <a href="/contact" className="text-emerald-600 hover:underline">contactez l'administration</a>{' '}
+                      pour une demande d'exception.
+                    </p>
+                    {user?.role === 'admin' && (
+                      <p className="text-xs text-amber-600 mt-0.5 flex items-center gap-1">
+                        <Shield className="h-3.5 w-3.5" />
+                        <span>Mode admin : vous pouvez utiliser un nom réservé.</span>
+                      </p>
+                    )}
                   </div>
 
                   {/* Lien public + toggle */}
@@ -1156,129 +1227,191 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
                       </div>
                     </div>
                   )}
+                </CardContent>
+              </Card>
 
-                  {/* Titre + Bio + Template */}
-                  <div className="grid grid-cols-1 gap-3">
-                    <div>
-                      <Label htmlFor="cv-title">Titre professionnel</Label>
-                      <Input id="cv-title" value={cvTitleValue} onChange={(e) => setCvTitleValue(e.target.value)} placeholder="Ex: Technicien QHSE Senior" />
-                    </div>
-                    <div>
-                      <Label htmlFor="cv-bio">Bio courte</Label>
-                      <Textarea id="cv-bio" rows={3} value={cvBioValue} onChange={(e) => setCvBioValue(e.target.value)} placeholder="Décrivez votre parcours..." />
-                    </div>
-                    {/* Layout du CV */}
-                    <div>
-                      <Label htmlFor="cv-layout">Format d'affichage</Label>
-                      <Select value={cvLayoutValue} onValueChange={(v) => setCvLayoutValue(v)}>
-                        <SelectTrigger id="cv-layout"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="sidebar">Sidebar (colonne foncée gauche)</SelectItem>
-                          <SelectItem value="centered">Centered (centré, pleine largeur)</SelectItem>
-                          <SelectItem value="split">Split (2 colonnes + bande colorée)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Palette de couleurs prédéfinies */}
-                    <div>
-                      <Label htmlFor="cv-palette">Palette de couleurs</Label>
-                      <Select value={cvTemplateValue} onValueChange={(v) => {
-                        setCvTemplateValue(v);
-                        // Appliquer la palette sélectionnée
-                        const palettes: Record<string, {p:string;a:string}> = {
-                          emerald: { p: '#059669', a: '#065f46' },
-                          ocean: { p: '#0284c7', a: '#0c4a6e' },
-                          sunset: { p: '#ea580c', a: '#9a3412' },
-                          royal: { p: '#7c3aed', a: '#5b21b6' },
-                          mono: { p: '#334155', a: '#0f172a' },
-                        };
-                        const pal = palettes[v] || palettes.emerald;
-                        setCvColorPrimaryValue(pal.p);
-                        setCvColorAccentValue(pal.a);
-                      }}>
-                        <SelectTrigger id="cv-palette"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="emerald">🍃 Emerald (vert HSE)</SelectItem>
-                          <SelectItem value="ocean">🌊 Ocean (bleu)</SelectItem>
-                          <SelectItem value="sunset">🌅 Sunset (orange)</SelectItem>
-                          <SelectItem value="royal">👑 Royal (violet)</SelectItem>
-                          <SelectItem value="mono">⚫ Mono (gris sobre)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Couleurs personnalisées */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label htmlFor="cv-color-primary">Couleur principale</Label>
-                        <div className="flex items-center gap-2 mt-1">
-                          <input
-                            type="color"
-                            id="cv-color-primary"
-                            value={cvColorPrimaryValue}
-                            onChange={(e) => setCvColorPrimaryValue(e.target.value)}
-                            className="h-9 w-12 rounded border border-slate-200 cursor-pointer"
-                          />
-                          <Input
-                            value={cvColorPrimaryValue}
-                            onChange={(e) => setCvColorPrimaryValue(e.target.value)}
-                            className="flex-1 text-xs font-mono"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <Label htmlFor="cv-color-accent">Couleur accent</Label>
-                        <div className="flex items-center gap-2 mt-1">
-                          <input
-                            type="color"
-                            id="cv-color-accent"
-                            value={cvColorAccentValue}
-                            onChange={(e) => setCvColorAccentValue(e.target.value)}
-                            className="h-9 w-12 rounded border border-slate-200 cursor-pointer"
-                          />
-                          <Input
-                            value={cvColorAccentValue}
-                            onChange={(e) => setCvColorAccentValue(e.target.value)}
-                            className="flex-1 text-xs font-mono"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Réseaux sociaux intégrés au CV */}
-                  <Separator />
+              {/* ============================================================ */}
+              {/* CARD 3 — Identité professionnelle (Titre + Bio) */}
+              {/* ============================================================ */}
+              <Card className="border-emerald-200 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-emerald-700">
+                    <User className="h-5 w-5" /> Identité professionnelle
+                  </CardTitle>
+                  <CardDescription>
+                    Votre titre et votre présentation professionnelle affichés en tête du CV public.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
                   <div>
-                    <h4 className="text-sm font-bold text-slate-700 mb-3">Réseaux sociaux & liens</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="facebook" className="gap-1.5"><Facebook className="h-4 w-4 text-blue-600" /> Facebook</Label>
-                        <Input id="facebook" value={facebook} onChange={(e) => setFacebook(e.target.value)} placeholder="https://facebook.com/…" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="linkedin" className="gap-1.5"><Linkedin className="h-4 w-4 text-sky-700" /> LinkedIn</Label>
-                        <Input id="linkedin" value={linkedin} onChange={(e) => setLinkedin(e.target.value)} placeholder="https://linkedin.com/in/…" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="twitter" className="gap-1.5"><Twitter className="h-4 w-4 text-slate-700" /> Twitter / X</Label>
-                        <Input id="twitter" value={twitter} onChange={(e) => setTwitter(e.target.value)} placeholder="https://twitter.com/…" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="website" className="gap-1.5"><Globe className="h-4 w-4 text-emerald-600" /> Site web</Label>
-                        <Input id="website" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://votre-site.com" />
-                      </div>
-                    </div>
+                    <Label htmlFor="cv-title">Titre professionnel</Label>
+                    <Input id="cv-title" value={cvTitleValue} onChange={(e) => setCvTitleValue(e.target.value)} placeholder="Ex: Technicien QHSE Senior" />
+                    <p className="text-xs text-slate-400 mt-1">Affiché sous votre nom sur le CV public.</p>
                   </div>
-
-                  {/* Bouton Enregistrer — à la fin, prend en compte tout */}
-                  <div className="flex justify-end pt-2">
-                    <Button onClick={handleSaveAllCV} disabled={savingSocial || usernameSaving} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-                      {savingSocial || usernameSaving ? (<><Loader2 className="h-4 w-4 animate-spin mr-2" /> Enregistrement…</>) : (<>Enregistrer tout</>)}
-                    </Button>
+                  <div>
+                    <Label htmlFor="cv-bio">Bio / présentation professionnelle</Label>
+                    <Textarea id="cv-bio" rows={5} value={cvBioValue} onChange={(e) => setCvBioValue(e.target.value)} placeholder="Présentez votre parcours, votre spécialisation, vos compétences principales et vos objectifs professionnels." />
+                    <p className="text-xs text-slate-400 mt-1">Présentation détaillée affichée en haut de votre CV public.</p>
                   </div>
                 </CardContent>
               </Card>
+
+              {/* ============================================================ */}
+              {/* CARD 4 — Contenu structuré du CV (7 rubriques via CVSections) */}
+              {/* ============================================================ */}
+              <Card className="border-emerald-200 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-emerald-700">
+                    <FileText className="h-5 w-5" /> Contenu structuré du CV
+                  </CardTitle>
+                  <CardDescription>
+                    Expériences, formations, compétences, certifications, langues et informations complémentaires.
+                    Chaque rubrique a son propre bouton « Enregistrer ».
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <CVSections profile={profile} onChanged={fetchProfile} />
+                </CardContent>
+              </Card>
+
+              {/* ============================================================ */}
+              {/* CARD 5 — Réseaux & liens */}
+              {/* ============================================================ */}
+              <Card className="border-emerald-200 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-emerald-700">
+                    <Globe className="h-5 w-5" /> Réseaux & liens
+                  </CardTitle>
+                  <CardDescription>
+                    Vos liens professionnels affichés sur le CV public.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="facebook" className="gap-1.5"><Facebook className="h-4 w-4 text-blue-600" /> Facebook</Label>
+                      <Input id="facebook" value={facebook} onChange={(e) => setFacebook(e.target.value)} placeholder="https://facebook.com/…" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="linkedin" className="gap-1.5"><Linkedin className="h-4 w-4 text-sky-700" /> LinkedIn</Label>
+                      <Input id="linkedin" value={linkedin} onChange={(e) => setLinkedin(e.target.value)} placeholder="https://linkedin.com/in/…" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="twitter" className="gap-1.5"><Twitter className="h-4 w-4 text-slate-700" /> Twitter / X</Label>
+                      <Input id="twitter" value={twitter} onChange={(e) => setTwitter(e.target.value)} placeholder="https://twitter.com/…" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="website" className="gap-1.5"><Globe className="h-4 w-4 text-emerald-600" /> Site web</Label>
+                      <Input id="website" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://votre-site.com" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* ============================================================ */}
+              {/* CARD 6 — Apparence du CV (Template + Palette + Couleurs) */}
+              {/* ============================================================ */}
+              <Card className="border-emerald-200 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-emerald-700">
+                    <Palette className="h-5 w-5" /> Apparence du CV
+                  </CardTitle>
+                  <CardDescription>
+                    Personnalisez le rendu visuel de votre CV public.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Layout */}
+                  <div>
+                    <Label htmlFor="cv-layout">Format d'affichage</Label>
+                    <Select value={cvLayoutValue} onValueChange={(v) => setCvLayoutValue(v)}>
+                      <SelectTrigger id="cv-layout"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="sidebar">Sidebar (colonne foncée gauche)</SelectItem>
+                        <SelectItem value="centered">Centered (centré, pleine largeur)</SelectItem>
+                        <SelectItem value="split">Split (2 colonnes + bande colorée)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Palette */}
+                  <div>
+                    <Label htmlFor="cv-palette">Palette de couleurs prédéfinie</Label>
+                    <Select value={cvTemplateValue} onValueChange={(v) => {
+                      setCvTemplateValue(v);
+                      const palettes: Record<string, {p:string;a:string}> = {
+                        emerald: { p: '#059669', a: '#065f46' },
+                        ocean: { p: '#0284c7', a: '#0c4a6e' },
+                        sunset: { p: '#ea580c', a: '#9a3412' },
+                        royal: { p: '#7c3aed', a: '#5b21b6' },
+                        mono: { p: '#334155', a: '#0f172a' },
+                      };
+                      const pal = palettes[v] || palettes.emerald;
+                      setCvColorPrimaryValue(pal.p);
+                      setCvColorAccentValue(pal.a);
+                    }}>
+                      <SelectTrigger id="cv-palette"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="emerald">🍃 Emerald (vert HSE)</SelectItem>
+                        <SelectItem value="ocean">🌊 Ocean (bleu)</SelectItem>
+                        <SelectItem value="sunset">🌅 Sunset (orange)</SelectItem>
+                        <SelectItem value="royal">👑 Royal (violet)</SelectItem>
+                        <SelectItem value="mono">⚫ Mono (gris sobre)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Couleurs personnalisées */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="cv-color-primary">Couleur principale</Label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <input
+                          type="color"
+                          id="cv-color-primary"
+                          value={cvColorPrimaryValue}
+                          onChange={(e) => setCvColorPrimaryValue(e.target.value)}
+                          className="h-9 w-12 rounded border border-slate-200 cursor-pointer"
+                        />
+                        <Input
+                          value={cvColorPrimaryValue}
+                          onChange={(e) => setCvColorPrimaryValue(e.target.value)}
+                          className="flex-1 text-xs font-mono"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="cv-color-accent">Couleur accent</Label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <input
+                          type="color"
+                          id="cv-color-accent"
+                          value={cvColorAccentValue}
+                          onChange={(e) => setCvColorAccentValue(e.target.value)}
+                          className="h-9 w-12 rounded border border-slate-200 cursor-pointer"
+                        />
+                        <Input
+                          value={cvColorAccentValue}
+                          onChange={(e) => setCvColorAccentValue(e.target.value)}
+                          className="flex-1 text-xs font-mono"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* ============================================================ */}
+              {/* BOUTON "Enregistrer tout" — en bas, sauvegarde tous les champs
+                  gérés par profile-page (Titre, Bio, Réseaux, Apparence, Username).
+                  Ne sauve PAS les rubriques structurées (CVSections a ses propres boutons). */}
+              {/* ============================================================ */}
+              <div className="flex justify-end">
+                <Button onClick={handleSaveAllCV} disabled={savingSocial || usernameSaving} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                  {savingSocial || usernameSaving ? (<><Loader2 className="h-4 w-4 animate-spin mr-2" /> Enregistrement…</>) : (<>Enregistrer tout</>)}
+                </Button>
+              </div>
+
             </div>
           </TabsContent>
 

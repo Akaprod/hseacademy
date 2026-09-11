@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
       db.certification.count({ where }),
     ]);
 
-    return NextResponse.json({ certifications, total, page, limit, pages: Math.ceil(total / limit) });
+    return NextResponse.json({ certifications, total, page, limit, totalPages: Math.ceil(total / limit) });
   } catch {
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
   }

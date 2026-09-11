@@ -7195,3 +7195,23 @@ select {
     }
   }
 }
+/* ============================================================================
+   SPLITCV — Grille 40/60 (custom car Tailwind v4 ne génère pas grid-cols-[2fr_3fr])
+   Source : public-cv.tsx, template SplitCV
+   ============================================================================ */
+@media (min-width: 768px) {
+  .split-cv-grid {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) !important;
+  }
+}
+
+/* ============================================================================
+   SIDEBARCV — Colonne contenu (col-span-2) car Tailwind v4 ne génère pas
+   la classe col-span-2. Sans cette règle, le contenu prend 1/3 au lieu de 2/3.
+   Source : public-cv.tsx, template SidebarCV
+   ============================================================================ */
+@media (min-width: 768px) {
+  .sidebar-cv-content {
+    grid-column: span 2 / span 2 !important;
+  }
+}

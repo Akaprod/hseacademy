@@ -102,6 +102,7 @@ export default function Footer({ onNavigate }: FooterProps) {
             <h4 className="font-bold text-white mb-4">Nos Formations</h4>
             <ul className="space-y-2.5">
               {[
+                { label: 'Diplôme Qualifié QHSE', slug: 'diplome-qualifie-qhse' },
                 { label: 'Technicien QHSE', slug: 'technicien-qhse' },
                 { label: 'Technicien Supérieur QHSE', slug: 'technicien-superieur-qhse' },
                 { label: 'Licence Professionnelle QHSE', slug: 'licence-professionnelle-qhse' },

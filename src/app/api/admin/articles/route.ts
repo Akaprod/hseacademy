@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
       db.article.count({ where }),
     ]);
 
-    return NextResponse.json({ articles, total, page, limit, pages: Math.ceil(total / limit) });
+    return NextResponse.json({ articles, total, page, limit, totalPages: Math.ceil(total / limit) });
   } catch (error) {
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
   }

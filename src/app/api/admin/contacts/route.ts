@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
       db.contactMessage.count({ where }),
     ]);
 
-    return NextResponse.json({ messages, total, page, limit, pages: Math.ceil(total / limit) });
+    return NextResponse.json({ messages, total, page, limit, totalPages: Math.ceil(total / limit) });
   } catch {
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
   }

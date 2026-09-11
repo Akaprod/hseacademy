@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
+import { VisitTracker } from "@/components/visit-tracker";
 
 export const metadata: Metadata = {
   title: "IICP - Institut International des Compétences Professionnelles QHSE",
@@ -32,6 +33,7 @@ export default function RootLayout({
       <body className="font-sans antialiased bg-background text-foreground">
         {children}
         <Toaster position="top-right" richColors />
+        <VisitTracker />
       </body>
     </html>
   );

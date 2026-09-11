@@ -25,6 +25,11 @@ interface UserData {
   name: string;
   email: string;
   role: string;
+  avatar?: string | null;
+  profile?: {
+    avatar?: string | null;
+    fullName?: string | null;
+  } | null;
 }
 
 export default function Page() {
@@ -35,6 +40,10 @@ export default function Page() {
   // User vient uniquement du serveur (via /api/auth/me)
   const [user, setUser] = useState<UserData | null>(null);
   const [userLoaded, setUserLoaded] = useState(false);
+  // Clé de remontage : incrémentée quand on re-clique sur la même page
+  // (ex: "Formation en Ligne" alors qu'on est déjà dans training mais dans un cours).
+  // Force le re-mount du composant et réinitialise son état interne (view = 'catalog').
+  const [navKey, setNavKey] = useState(0);
 
   // Au mount, fetch /api/auth/me — source de vérité serveur
   useEffect(() => {
@@ -51,9 +60,16 @@ export default function Page() {
   }, []);
 
   const handleNavigate = useCallback((page: string, data?: Record<string, string>) => {
+    // Si on re-clique sur la même page (ex: "Formation en Ligne" alors qu'on est
+    // déjà dans training mais dans un cours/chapitre), on force le re-mount du
+    // composant en incrémentant un compteur. Cela réinitialise l'état interne
+    // (view = 'catalog') et permet de revenir à la liste des formations.
+    if (page === currentPage) {
+      setNavKey(k => k + 1);
+    }
     setCurrentPage(page);
     setPageData(data || {});
-  }, []);
+  }, [currentPage]);
 
   const handleAuthOpen = useCallback((mode: 'login' | 'register') => {
     setAuthMode(mode);
@@ -114,7 +130,7 @@ export default function Page() {
       case 'about':
         return <AboutPage />;
       case 'training':
-        return <TrainingPage user={user} onAuthOpen={handleAuthOpen} onNavigate={handleNavigate} />;
+        return <TrainingPage key={navKey} user={user} onAuthOpen={handleAuthOpen} onNavigate={handleNavigate} />;
       case 'profile':
         return <ProfilePage user={user} onNavigate={handleNavigate} onLogout={handleLogout} initialTab={pageData.tab} />;
       case 'admin':

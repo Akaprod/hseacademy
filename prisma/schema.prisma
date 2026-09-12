@@ -1,0 +1,877 @@
+generator client {
+  provider     = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-1.1.x"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  password      String?
+  phone         String?
+  role          String   @default("user") // user, admin
+  status        String   @default("active") // active, disabled, blocked
+  avatar        String?
+  bio           String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  comments          Comment[]
+  certifications    Certification[]
+  enrollments       Enrollment[]
+  attestations      CourseAttestation[]
+  profile           UserProfile?
+  emailTokens       EmailVerificationToken[]
+  coursePayments    CoursePayment[]
+  attestationPayments AttestationPayment[]
+  wallet            Wallet?
+  paymentRequests   PaymentRequest[]
+  // Assistant IA — Phase 2 (mémoire conversationnelle future)
+  assistantConversations AssistantConversation[]
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  color       String   @default("#059669")
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  articles    Article[]
+}
+
+model Article {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  excerpt     String?
+  content     String   @default("")
+  coverImage  String?
+  published   Boolean  @default(true)
+  featured    Boolean  @default(false)
+  viewCount   Int      @default(0)
+  authorName  String   @default("IICP")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id])
+
+  comments    Comment[]
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  status    String   @default("approved") // pending, approved, rejected
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  articleId String
+  article   Article  @relation(fields: [articleId], references: [id])
+}
+
+model Certification {
+  id              String   @id @default(cuid())
+  certificateNo   String   @unique
+  type            String   // attestation, diplome
+  fullName        String
+  programName     String
+  level           String   // technicien, licence, master
+  issuedDate      DateTime
+  expirationDate  DateTime?
+  status          String   @default("valid") // valid, expired, revoked
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  userId          String?
+  user            User?   @relation(fields: [userId], references: [id])
+}
+
+model Formation {
+  id                String   @id @default(cuid())
+  title             String
+  slug              String   @unique
+  shortDescription  String
+  fullDescription   String   @default("")
+  level             String   // technicien, technicien-superieur, licence, master, certifiant
+  duration          String
+  durationHours     String?
+  prerequisites     String?
+  objectives        String   @default("[]") // JSON array
+  program           String   @default("[]") // JSON array
+  price             String?
+  priceIndividual   String?
+  priceGroup        String?
+  priceEnterprise   String?
+  mode              String   @default("presentiel") // presentiel, distance, hybride
+  type              String   @default("diplomante") // diplomante, certifiante
+  coverImage        String?
+  featured          Boolean  @default(false)
+  order             Int      @default(0)
+
+  // ===== ARCHIVE (soft delete) =====
+  archived          Boolean  @default(false)
+
+  // ===== SEO (shared by both types) =====
+  seoTitle          String?
+  seoDescription    String?
+  seoKeywords       String?
+  seoImage          String?
+  seoSlug           String?   @unique
+  seoRobots         String   @default("index,follow")
+  seoCanonical      String?
+  seoOgTitle        String?
+  seoOgDescription  String?
+  seoOgImage        String?
+
+  // ===== DIPLÔMANTES-specific =====
+  careerOutcomes    String   @default("[]")   // JSON array of métiers accessibles
+  degreeType         String?
+
+  // ===== CERTIFIANTES-specific =====
+  certificateValidity      String?
+  certificatePrefix        String?
+  mandatoryPrerequisites   String   @default("[]")  // JSON array
+  targetAudience           String?
+  certifyingBody           String?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model Newsletter {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Testimonial {
+  id        String   @id @default(cuid())
+  name      String
+  role      String
+  company   String?
+  content   String
+  avatar    String?
+  rating    Int      @default(5)
+  featured  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  subject   String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Page {
+  id              String   @id @default(cuid())
+  title           String
+  slug            String   @unique
+  content         String   @default("")
+  metaTitle       String?
+  metaDescription String?
+  primaryKeyword  String?
+  keywords        String?
+  excerpt         String?
+  coverImage      String?
+  faqJson         String?
+  published       Boolean  @default(true)
+  order           Int      @default(0)
+  showInMenu      Boolean  @default(false)
+  parentSlug      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model MenuItem {
+  id          String   @id @default(cuid())
+  label       String
+  page        String?
+  url         String?
+  parentId    String?
+  parent      MenuItem?  @relation("MenuHierarchy", fields: [parentId], references: [id])
+  children    MenuItem[] @relation("MenuHierarchy")
+  order       Int      @default(0)
+  icon        String?
+  target      String   @default("_self")
+  visible     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model OnlineCourse {
+  id              String   @id @default(cuid())
+  title           String
+  slug            String   @unique
+  description     String   @default("")
+  shortDescription String   @default("")
+  level           String   @default("debutant")
+  icon            String   @default("BookOpen")
+  coverImage      String?
+  price           Float    @default(0)
+  isFree          Boolean  @default(true)
+  published       Boolean  @default(true)
+  featured        Boolean  @default(false)
+  order           Int      @default(0)
+  totalChapters   Int      @default(0)
+  totalHours      String   @default("")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  chapters     Chapter[]
+  enrollments  Enrollment[]
+  attestations CourseAttestation[]
+}
+
+model Chapter {
+  id          String   @id @default(cuid())
+  title       String
+  content     String   @default("")
+  order       Int      @default(0)
+  courseId    String
+  course      OnlineCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  questions Question[]
+}
+
+model Question {
+  id            String   @id @default(cuid())
+  question      String
+  options       String   @default("[]")
+  correctIndex  Int      @default(0)
+  explanation   String   @default("")
+  order         Int      @default(0)
+  chapterId     String
+  chapter       Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Enrollment {
+  id               String    @id @default(cuid())
+  userId           String
+  user             User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId         String
+  course           OnlineCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  status           String    @default("active")
+  currentChapter   Int       @default(1)
+  completedChapters String   @default("[]")
+  chapterScores    String   @default("{}")
+  overallScore     Int       @default(0)
+  startedAt        DateTime  @default(now())
+  completedAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  // Phase 3 — Payment system
+  courseOrderIndex Int       @default(0)  // 1 = first course (free), 2+ = paid
+  paymentStatus    String    @default("not_required") // not_required|pending|submitted|validated|rejected
+
+  coursePayment    CoursePayment?
+
+  @@unique([userId, courseId])
+}
+
+model CourseAttestation {
+  id              String   @id @default(cuid())
+  attestationNo   String   @unique
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId        String
+  course          OnlineCourse @relation(fields: [courseId], references: [id])
+  enrollmentId    String
+  fullName        String
+  courseName      String
+  overallScore    Int
+  issuedDate      DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // AT-P2 : gestion du statut et de la révocation
+  status          String   @default("valid") // valid, revoked
+  revokedAt       DateTime?
+  revokedReason   String?
+  revokedBy       String?  // User id de l'admin qui a révoqué (référence souple, pas de relation Prisma pour éviter conflit avec user)
+
+  // AT-P5 : numéro de série public professionnel (non prédictible) + signature cryptographique
+  serialNumber    String   @unique
+  signatureHash   String
+}
+
+// ============================================================================
+// PROFIL — Couche 2 : identité personnelle/professionnelle
+// ============================================================================
+
+model UserProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Identité
+  fullName        String?  // Nom complet validé (séparé de User.name)
+  fullNameValidated Boolean @default(false)
+  fullNameOriginal String? // Snapshot du nom original au moment de la validation
+  fullNameHistory  String   @default("[]") // JSON array: [{old, new, date, by, reason}]
+  birthDate       DateTime?
+  birthPlace      String?
+  residence       String?
+  address         String?
+
+  // Photo de profil (facultative)
+  avatar          String?
+
+  // Réseaux sociaux
+  facebook        String?
+  linkedin        String?
+  twitter         String?
+  website         String?
+
+  // CV Public — username + visibilité
+  username        String?  @unique // 5-12 caractères, lettres + chiffres + underscore
+  profilePublic   Boolean  @default(false) // CV visible publiquement sur /@username
+  cvTemplate      String   @default("emerald") // emerald | ocean | sunset | royal | mono
+  cvColorPrimary  String   @default("#059669") // Couleur principale (ex: emerald-600)
+  cvColorAccent   String   @default("#065f46") // Couleur accent (ex: emerald-800)
+  cvLayout        String   @default("sidebar") // sidebar | centered | split
+  cvTitle         String?  // Titre professionnel (ex: "Technicien QHSE")
+  cvBio           String?  // Bio courte pour le CV
+  cvSkills        String   @default("[]") // JSON array de compétences (legacy: array de strings)
+  cvExperience    String   @default("[]") // JSON array d'expériences (legacy)
+
+  // ===== 7 RUBRIQUES CV PROFESSIONNEL (ajout Sept 2026) =====
+  // Toutes stockées en JSON — pas de tables séparées pour rester compatible SQLite
+  // et éviter des migrations lourdes. Les champs sont additifs (non destructifs).
+  cvProfessionalProfile String? // 1. Présentation professionnelle (textarea, ~500-1000 chars)
+  cvExperiences    String   @default("[]") // 2. JSON array d'expériences professionnelles
+  cvEducation      String   @default("[]") // 3. JSON array de formations & diplômes
+  cvSkillsStructured String @default("[]") // 4. JSON array de compétences structurées (nom + niveau + catégorie) — cvSkills (legacy) reste pour rétro-compat
+  cvCertifications String   @default("[]") // 5. JSON array de certifications & attestations
+  cvLanguages      String   @default("[]") // 6. JSON array de langues
+  cvAdditionalInfo String   @default("{}") // 7. JSON object : permis, mobilité, disponibilité, projets, centres d'intérêt
+  cvVolunteer      String   @default("[]") // 7b. JSON array d'expériences de bénévolat
+
+  // ===== Coordonnées professionnelles CV (Contact section) =====
+  cvContactPhone    String?  // Téléphone professionnel
+  cvContactEmail    String?  // Email professionnel
+  cvContactLocation String?  // Localisation professionnelle
+
+  // Vérification
+  emailVerified   Boolean  @default(false)
+  emailVerifiedAt DateTime?
+  phoneVerified   Boolean  @default(false)
+  phoneVerifiedAt DateTime?
+  phoneCountry    String?  // Code pays ISO (ex: "MA")
+  phoneNormalized String?  @unique // Format E.164 +2126XXXXXXXX
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// ============================================================================
+// VÉRIFICATION EMAIL — tokens à usage unique avec expiration
+// ============================================================================
+
+model EmailVerificationToken {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token       String   @unique  // Hash du token (pas le token brut)
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ============================================================================
+// PHASE 3 — PAIEMENT COURS (120 MAD pour cours 2+)
+// ============================================================================
+
+model CoursePayment {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enrollmentId      String    @unique
+  enrollment        Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  courseId          String
+
+  amount            Float     // 120.0
+  currency          String    @default("MAD")
+  method            String    // bank_transfer | paypal
+
+  status            String    @default("pending")
+  // pending | submitted | validated | rejected | cancelled
+
+  // Preuve de paiement (fichier stocké sur filesystem privé)
+  proofPath         String?
+  proofOriginalName String?
+  proofMimeType     String?
+  proofSize         Int?
+
+  submittedAt       DateTime?
+  validatedAt       DateTime?
+  validatedBy       String?   // User id de l'admin (référence souple)
+  rejectionReason   String?
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([courseId])
+}
+
+// ============================================================================
+// PHASE 3 — PAIEMENT ATTESTATION IMPRIMÉE (190 MAD, optionnel)
+// ============================================================================
+
+model AttestationPayment {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attestationId     String
+
+  amount            Float     // 190.0
+  currency          String    @default("MAD")
+  method            String    // bank_transfer | paypal
+
+  status            String    @default("pending")
+  // pending | submitted | validated | rejected | cancelled
+
+  proofPath         String?
+  proofOriginalName String?
+  proofMimeType     String?
+  proofSize         Int?
+
+  submittedAt       DateTime?
+  validatedAt       DateTime?
+  validatedBy       String?
+  rejectionReason   String?
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([attestationId])
+  @@index([status])
+}
+
+// ============================================================================
+// LEGAL SETTINGS — Informations juridiques administrables (singleton)
+// ============================================================================
+//
+// Pattern singleton : une seule ligne avec id="default". Tous les champs
+// sont OPTIONAL — l'admin renseigne progressivement ce qu'il possède.
+// Les pages publiques ne doivent JAMAIS afficher un champ vide comme
+// s'il s'agissait d'une information réelle.
+//
+// Champs :
+//   - Établissement (raison sociale, nom commercial, responsable)
+//   - Coordonnées (adresse, ville, pays, téléphone, email, site web)
+//   - Identifiants juridiques marocains (ICE, RC, IF)
+//   - Autorisation (référence + organisme)
+//   - CNDP (référence récépissé, si applicable)
+//   - Textes libres pour les 3 pages légales (remboursement, confidentialité,
+//     conditions) — l'admin peut coller ses propres contenus structurés.
+// ============================================================================
+
+model LegalSettings {
+  id              String   @id @default("default")
+
+  // Établissement
+  legalName       String?  // Raison sociale officielle
+  commercialName  String?  // Nom commercial (si différent)
+  representative  String?  // Responsable / représentant légal
+
+  // Coordonnées
+  address         String?
+  city            String?
+  country         String?
+  phone           String?
+  email           String?
+  website         String?
+
+  // Identifiants juridiques (Maroc)
+  ice             String?  // Identifiant Commun de l'Entreprise
+  rc              String?  // Registre de Commerce
+  if              String?  // Identifiant Fiscal
+
+  // Autorisation d'exercice / agrément (si applicable)
+  authorizationRef String?  // Référence de l'autorisation
+  authorityName   String?  // Organisme / autorité ayant délivré
+
+  // CNDP (Commission Nationale de Contrôle de la Protection des Données Personnelles)
+  cndpReceipt     String?  // Numéro de récépissé CNDP, si déclaré
+
+  // Contenus libres des pages légales (Markdown ou texte simple)
+  // — L'admin peut coller ici le texte complet de chaque politique.
+  refundPolicy    String?
+  privacyPolicy   String?
+  termsOfService  String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ============================================================================
+// WALLET — Système de portefeuille client
+// ============================================================================
+//
+// Wallet : 1 par utilisateur. Contient le solde courant.
+// WalletTransaction : historique de toutes les opérations (rechargement,
+//   achat cours, achat attestation, remboursement, bonus promotionnel).
+//
+// Types de transaction :
+//   - charge     : rechargement du wallet par le client
+//   - purchase   : achat d'un cours ou attestation avec le solde wallet
+//   - refund     : remboursement vers le wallet
+//   - bonus      : bonus promotionnel (ex: +5% sur rechargement)
+//
+// Les montants sont en MAD. Le solde est calculé à partir des transactions.
+// ============================================================================
+
+model Wallet {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balance         Float    @default(0)
+  currency        String   @default("MAD")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  transactions    WalletTransaction[]
+}
+
+model WalletTransaction {
+  id              String   @id @default(cuid())
+  walletId        String
+  wallet          Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  // Type d'opération
+  type            String   // charge | purchase | refund | bonus
+
+  // Montant en MAD (toujours positif ; le sens est déterminé par `type`)
+  amount          Float
+
+  // Pour les achats (purchase) : référence vers le paiement concerné
+  coursePaymentId     String?
+  attestationPaymentId String?
+
+  // Pour les rechargements (charge) : méthode de paiement utilisée
+  paymentMethod   String?  // paypal | stripe | bank_transfer
+
+  // Description lisible par l'utilisateur
+  description     String   @default("")
+
+  // Promotion (si bonus)
+  promotionId     String?
+
+  // Pour les paiements via payment-request : référence vers la demande
+  paymentRequestId String?
+
+  createdAt       DateTime @default(now())
+
+  @@index([walletId])
+  @@index([type])
+}
+
+// ============================================================================
+// PAYMENT SETTINGS — Paramètres de paiement administrables (singleton)
+// ============================================================================
+//
+// Configuré par l'admin depuis le dashboard. Remplace les constantes
+// hardcodées (PAYPAL_EMAIL, etc.) par des valeurs dynamiques.
+//
+// Permet d'activer/désactiver les méthodes de paiement et de modifier les
+// coordonnées sans toucher au code.
+// ============================================================================
+
+model PaymentSettings {
+  id              String   @id @default("default")
+
+  // Prix par défaut (modifiable par l'admin)
+  attestationPrintPrice Float  @default(190)
+  currency              String @default("MAD")
+
+  // PayPal
+  paypalEnabled   Boolean  @default(true)
+  paypalEmail     String?
+
+  // Stripe
+  stripeEnabled   Boolean  @default(false)
+  stripePublicKey String?
+  stripeSecretKey String?
+
+  // Virement bancaire
+  bankTransferEnabled Boolean @default(true)
+  bankName       String?
+  bankAccountName String?
+  bankIban       String?
+  bankSwift      String?
+  bankNotes      String?  // Instructions additionnelles
+
+  // Wallet
+  walletEnabled   Boolean  @default(false)
+
+  // WhatsApp pour preuves de paiement
+  whatsappNumber  String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ============================================================================
+// PAYMENT REQUEST — Demande de paiement côté client (anti-spam)
+// ============================================================================
+//
+// Système de demande de paiement pour éviter le spam de rechargements wallet.
+// Règles métier :
+//   - Max 10 demandes en cours par utilisateur (boutons désactivés au-delà)
+//   - Chaque demande expire après 72 heures (statut "expired")
+//   - L'utilisateur peut supprimer ses anciennes demandes
+//   - L'utilisateur peut soumettre une preuve (image ou texte)
+//   - Seules les demandes avec preuve soumise sont vues par l'admin
+//   - L'admin valide/refuse uniquement les demandes avec preuve
+//
+// Statuts :
+//   pending   — demande créée, en attente de preuve
+//   submitted — preuve soumise, en attente de validation admin
+//   validated — validé par admin (solde crédité pour wallet_charge)
+//   rejected  — refusé par admin
+//   expired   — demande expirée (72h dépassées)
+//   cancelled — annulé par l'utilisateur
+//
+// Types :
+//   wallet_charge  — rechargement wallet
+//   course_payment — paiement de cours
+//   print_payment  — attestation imprimée
+// ============================================================================
+
+model PaymentRequest {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reqType         String   @default("wallet_charge")
+  amount          Float
+  method          String
+  reqStatus       String   @default("pending")
+  description     String   @default("")
+  expiresAt       DateTime
+  proofPath       String?
+  proofOriginalName String?
+  proofMimeType   String?
+  proofSize       Int?
+  submittedAt     DateTime?
+  validatedAt     DateTime?
+  validatedBy     String?
+  rejectionReason String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  @@index([userId])
+  @@index([reqStatus])
+  @@index([reqType])
+}
+
+// ============================================================================
+// PROFIL DU SITE — singleton (id = "default")
+// ============================================================================
+
+model SiteProfile {
+  id              String   @id @default("default")
+
+  // Identité du site
+  siteName        String?  // HSE Academy
+  siteLogo        String?  // URL logo / miniature
+  siteDescription String?  // Meta description par défaut
+  siteKeywords    String?  // Mots-clés SEO globaux (comma-separated)
+  siteUrl         String?  // URL canonique (https://hseacademy.online)
+  gscVerification String?  // Google Search Console verification ID
+
+  // Réseaux sociaux (JSON-LD Organization)
+  facebook        String?
+  twitter         String?
+  linkedin        String?
+  instagram       String?
+  youtube         String?
+
+  // Sitemap
+  sitemapUrl      String?  // URL du sitemap soumis (généré automatiquement)
+  sitemapUpdatedAt DateTime?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ============================================================================
+// VISITES — tracker maison
+// ============================================================================
+
+model Visit {
+  id              String   @id @default(cuid())
+  // Page visitée
+  path            String   // ex: "/", "/f/master-professionnel-qhse", "/pages/hse"
+  pageType        String   // "home", "formation", "page_seo", "article", "course", "cv_public"
+  referrer        String?  // URL referrer (referer HTTP) — pour identifier google/facebook/direct
+  referrerSource  String?  // ex: "direct", "google", "facebook", "twitter", "linkedin", "other"
+
+  // Visiteur
+  ip              String?  // IP hashée (privacy — pas l'IP brute)
+  userAgent       String?  // User-Agent (pour identifier bots vs humans)
+  country         String?  // Pays via IP-API (ex: "Morocco", "France")
+  countryCode     String?  // Code ISO (ex: "MA", "FR")
+  city            String?  // Ville
+  sessionId       String?  // Session ID (hash aléatoire stocké en localStorage côté client)
+
+  createdAt       DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([path])
+  @@index([country])
+  @@index([referrerSource])
+  @@index([pageType])
+}
+
+// ============================================================================
+// ASSISTANT IA — Module autonome (Phase 1 + Phase 2)
+// ============================================================================
+// Modèles :
+//   - AssistantConfig       : singleton global (activation + 3 modes + identité)
+//   - AssistantInstruction   : 4 catégories éditables (general/commercial/user/admin)
+//   - AssistantBehavior      : singleton personnalité (style/ton/longueur/consignes)
+//   - AssistantSourceConfig  : une ligne par source de connaissance (activation on/off)
+//   - AssistantConversation  : Phase 2 future (mémoire)
+//   - AssistantMessage       : Phase 2 future (historique)
+//
+// ⚠️ SYSTEM SAFETY RULES sont JAMAIS stockées en DB — codées en dur côté serveur
+// dans src/assistant/instructions/system-safety.ts.
+// ============================================================================
+
+model AssistantConfig {
+  id                String   @id @default("default") // singleton
+
+  // === [Phase 1] Activation globale + par mode ===
+  enabled           Boolean  @default(false)
+  commercialEnabled Boolean  @default(true)
+  userEnabled       Boolean  @default(true)
+  adminEnabled      Boolean  @default(true)
+
+  // === [Phase 2] Configuration générale ===
+  name              String   @default("Assistant HSE Academy") // Nom affiché de l'assistant
+  welcomeMessage    String   @default("Bonjour, je suis l'Assistant IA de HSE Academy. Comment puis-je vous aider ?")
+  language          String   @default("fr") // fr | en | ar
+  availabilityMode  String   @default("always") // always | business_hours | manual
+
+  updatedAt         DateTime @updatedAt
+  updatedBy         String?
+
+  @@map("assistant_config")
+}
+
+model AssistantInstruction {
+  id            String   @id @default(cuid())
+  category      String   @unique // "general" | "commercial" | "user" | "admin" | "limits"
+  // Note : "limits" est une 5e catégorie pour les limites conversationnelles
+  // supplémentaires définies par l'admin (espace "Limites et interdictions").
+  content       String   @default("")
+  updatedAt     DateTime @updatedAt
+  updatedBy     String?
+
+  @@map("assistant_instruction")
+}
+
+// === [Phase 2] Personnalité et comportement (singleton) ===
+model AssistantBehavior {
+  id                String   @id @default("default") // singleton
+
+  // Style de communication
+  style             String   @default("professional") // professional | commercial | friendly | pedagogical | concise
+  // Ton
+  tone              String   @default("formal") // formal | natural | dynamic | institutional
+  // Longueur des réponses
+  responseLength    String   @default("normal") // short | normal | detailed
+
+  // Consignes personnalisées (textarea libre — viennent s'ajouter aux instructions)
+  customGuidelines  String   @default("")
+
+  updatedAt         DateTime @updatedAt
+  updatedBy         String?
+
+  @@map("assistant_behavior")
+}
+
+// === [Phase 2] Sources de connaissance — activation par catégorie ===
+// Une ligne par catégorie de source (formations, courses, articles, etc.)
+// L'admin peut activer/désactiver chaque source indépendamment.
+// La synchronisation automatique du contenu sera implémentée en Phase 3.
+model AssistantSourceConfig {
+  id            String   @id @default(cuid())
+  category      String   @unique // "formations" | "courses" | "promotions" | "articles" | "faq" | "public_pages" | "institutional"
+  enabled       Boolean  @default(true) // activation on/off
+  // Indique si la source contient du contenu public (vs privé)
+  isPublic      Boolean  @default(true)
+  // Dernière synchronisation (Phase 3 — null en Phase 2)
+  lastSyncAt    DateTime?
+  // Nombre de documents indexés (Phase 3 — 0 en Phase 2)
+  documentCount Int      @default(0)
+
+  updatedAt     DateTime @updatedAt
+  updatedBy     String?
+
+  @@map("assistant_source_config")
+}
+
+// === Phase 2 future : Mémoire conversationnelle (structure prête) ===
+model AssistantConversation {
+  id          String   @id @default(cuid())
+  userId      String
+  mode        String   // "commercial" | "user" | "admin"
+  title       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages    AssistantMessage[]
+
+  @@index([userId])
+  @@index([updatedAt])
+  @@map("assistant_conversation")
+}
+
+model AssistantMessage {
+  id              String   @id @default(cuid())
+  conversationId  String
+  role            String   // "user" | "assistant" | "system"
+  content         String
+  mode            String
+  createdAt       DateTime @default(now())
+
+  conversation    AssistantConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([createdAt])
+  @@map("assistant_message")
+}

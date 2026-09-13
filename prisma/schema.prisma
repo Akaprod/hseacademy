@@ -875,3 +875,67 @@ model AssistantMessage {
   @@index([createdAt])
   @@map("assistant_message")
 }
+
+// ============================================================================
+// MULTI-LLM PROVIDER ARCHITECTURE
+// ============================================================================
+// 2 nouvelles tables pour gérer plusieurs providers (Groq, Z.ai, OpenAI,
+// Anthropic, DeepSeek, Mistral, ...) et plusieurs API keys par provider,
+// avec failover automatique et statut exploitable.
+//
+// Migration NON DESTRUCTIVE : tables nouvelles, aucun impact sur les 6 tables
+// assistant_* existantes. La table assistant_config conserve son rôle de
+// configuration "globale" du bot (enabled, modes, name) ; la sélection du
+// provider actif se fait ici, par champ enabled + priority.
+//
+// SÉCURITÉ API KEYS :
+//   - apiKey stocké en clair en DB (pattern Stripe / OpenAI / Vercel)
+//   - perms DB = 600, fichier hors web-root
+//   - JAMAIS retourné par API — seul keyHint (4 derniers chars) est exposé
+//   - Lecture côté serveur uniquement (provider adapters)
+// ============================================================================
+
+model AssistantLlmProvider {
+  id               String                @id @default(cuid())
+  code             String                @unique // "groq" | "zai" | "openai" | "anthropic" | "deepseek" | "mistral"
+  displayName      String // "Groq" | "Z.ai" | "OpenAI" (label affiché dashboard)
+  adapter          String // "openai_compatible" | "zai_native"
+  baseUrl          String // "https://api.groq.com/openai/v1" | "https://api.z.ai/api/paas/v4"
+  enabled          Boolean               @default(true)
+  priority         Int                   @default(10) // 1 = highest priority (lower wins)
+  defaultModel     String // "llama-3.3-70b-versatile" | "glm-4.7-flash"
+  availableModels  String                @default("[]") // JSON array of model names, admin editable
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  apiKeys          AssistantLlmApiKey[]
+
+  @@map("assistant_llm_provider")
+}
+
+model AssistantLlmApiKey {
+  id             String   @id @default(cuid())
+  providerId     String
+  label          String // "Groq Production 1"
+  apiKey         String // plaintext in DB, NEVER exposed via API
+  keyHint        String   @default("") // last 4 chars for display (***...ABCD)
+  enabled        Boolean  @default(true)
+  priority       Int      @default(10) // within a provider, lower wins
+  status         String   @default("never_used")
+  // never_used | active | rate_limited | quota_exhausted | auth_error
+  // | network_error | disabled | invalid
+  lastUsedAt     DateTime?
+  lastSuccessAt  DateTime?
+  lastErrorAt    DateTime?
+  lastErrorCode  String?
+  failureCount   Int      @default(0)
+  metadata       String   @default("") // JSON — extra info (rate limit reset time, etc.)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  provider       AssistantLlmProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId, priority])
+  @@index([status])
+  @@map("assistant_llm_api_key")
+}

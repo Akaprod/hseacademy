@@ -74,6 +74,20 @@ function checkAiProviderConfigured(): boolean {
 
 export async function getStatus(): Promise<AssistantStatus> {
   const config = await getConfig();
+  // aiProviderConfigured = true si .z-ai-config existe (legacy path)
+  // OU si au moins un provider actif avec clé existe en DB (multi-LLM path)
+  let hasDbProvider = false;
+  try {
+    const providerCount = await db.assistantLlmProvider.count({
+      where: {
+        enabled: true,
+        apiKeys: { some: { enabled: true, status: { not: 'invalid' } } },
+      },
+    });
+    hasDbProvider = providerCount > 0;
+  } catch {
+    // Tables multi-LLM pas encore migrées — fallback legacy path only
+  }
   return {
     enabled: config.enabled,
     name: config.name,
@@ -82,7 +96,7 @@ export async function getStatus(): Promise<AssistantStatus> {
       user: config.userEnabled,
       admin: config.adminEnabled,
     },
-    aiProviderConfigured: checkAiProviderConfigured(),
+    aiProviderConfigured: checkAiProviderConfigured() || hasDbProvider,
     version: SYSTEM_SAFETY_VERSION,
   };
 }

@@ -1,0 +1,265 @@
+// ============================================================================
+// LLM Manager — Orchestrateur multi-provider + multi-key + failover
+// ============================================================================
+// Rôle :
+//   1. Lire la liste des providers actifs (DB, triés par priorité asc)
+//   2. Pour chaque provider actif:
+//      - Lire la liste des clés actives (DB, triées par priorité asc)
+//      - Pour chaque clé : appeler l'adapter du provider
+//      - Si succès : retourner le content + updater status=active
+//      - Si erreur temporaire (rate_limited/network_error/server_error) :
+//        updater status, essayer la clé suivante
+//      - Si erreur auth_error : marquer clé invalid + essayer suivante
+//      - Si erreur empty_content : essayer clé suivante (config modèle ?
+//        modèle thinking mal configuré)
+//   3. Si tous providers échouent :
+//      - Fallback Z.ai via .z-ai-config (legacy path — preserve existing)
+//      - Si legacy also fails → return null (route shows LLM_FALLBACK_REPLY)
+//
+// La signature publique `callLLM(systemPrompt, conversationMessages, maxTokens)`
+// est PRÉSERVÉE — aucun changement côté `chat/route.ts`.
+// ============================================================================
+
+import { db } from '@/lib/db';
+import { getProviderAdapter } from '../providers/registry';
+import { zaiAdapter, readZaiConfigFile } from '../providers/zai';
+import type { LLMMessage } from './llm';
+import type { LLMCallResult, LLMCallStatus } from '../providers/types';
+
+// ============================================================================
+// Types internes
+// ============================================================================
+interface ProviderRow {
+  id: string;
+  code: string;
+  displayName: string;
+  adapter: string;
+  baseUrl: string;
+  defaultModel: string;
+  priority: number;
+}
+
+interface ApiKeyRow {
+  id: string;
+  providerId: string;
+  label: string;
+  apiKey: string;
+  priority: number;
+}
+
+// ============================================================================
+// Lecture des providers actifs en DB
+// ============================================================================
+async function getActiveProviders(): Promise<ProviderRow[]> {
+  try {
+    const rows = await db.assistantLlmProvider.findMany({
+      where: { enabled: true },
+      orderBy: [{ priority: 'asc' }, { createdAt: 'asc' }],
+      select: {
+        id: true, code: true, displayName: true, adapter: true,
+        baseUrl: true, defaultModel: true, priority: true,
+      },
+    });
+    return rows.map(r => ({ ...r }));
+  } catch (error: any) {
+    console.error('[llm-manager] Failed to load providers from DB:', error?.message || error);
+    return [];
+  }
+}
+
+// ============================================================================
+// Lecture des clés actives pour un provider
+// ============================================================================
+async function getActiveKeysForProvider(providerId: string): Promise<ApiKeyRow[]> {
+  try {
+    const rows = await db.assistantLlmApiKey.findMany({
+      where: {
+        providerId,
+        enabled: true,
+        // Exclure les clés marquées invalid (mais garder rate_limited qui peuvent reset)
+        status: { not: 'invalid' },
+      },
+      orderBy: [{ priority: 'asc' }, { createdAt: 'asc' }],
+      select: { id: true, providerId: true, label: true, apiKey: true, priority: true },
+    });
+    return rows.map(r => ({ ...r }));
+  } catch (error: any) {
+    console.error(`[llm-manager] Failed to load API keys for provider ${providerId}:`, error?.message || error);
+    return [];
+  }
+}
+
+// ============================================================================
+// Update key status après un appel
+// ============================================================================
+async function updateKeyStatus(
+  keyId: string,
+  result: LLMCallResult
+): Promise<void> {
+  const now = new Date();
+  const status = mapCallStatusToKeyStatus(result.status);
+
+  // Don't override 'invalid' or 'disabled' once set (admin-controlled)
+  // unless the new status is success (which clears rate_limited/quota_exhausted)
+  const data: any = {
+    lastUsedAt: now,
+    lastErrorCode: result.errorCode || null,
+  };
+
+  if (result.status === 'success') {
+    data.status = 'active';
+    data.lastSuccessAt = now;
+    data.failureCount = 0;
+  } else {
+    data.lastErrorAt = now;
+    // Only update status if current is not invalid/disabled
+    if (status !== 'invalid' && status !== 'disabled') {
+      data.status = status;
+    }
+    // Increment failure count
+    data.failureCount = { increment: 1 };
+  }
+
+  try {
+    await db.assistantLlmApiKey.update({
+      where: { id: keyId },
+      data,
+    });
+  } catch (error: any) {
+    console.error(`[llm-manager] Failed to update key ${keyId} status:`, error?.message || error);
+  }
+}
+
+function mapCallStatusToKeyStatus(callStatus: LLMCallStatus): string {
+  switch (callStatus) {
+    case 'success': return 'active';
+    case 'rate_limited': return 'rate_limited';
+    case 'auth_error': return 'auth_error';
+    case 'quota_exhausted': return 'quota_exhausted';
+    case 'network_error': return 'network_error';
+    case 'empty_content': return 'active'; // model config issue, not key issue
+    case 'server_error':
+    case 'client_error':
+    case 'unknown_error':
+    default:
+      return 'active'; // keep key active, transient error
+  }
+}
+
+// ============================================================================
+// Tentative d'appel à un provider avec rotation des clés
+// ============================================================================
+async function tryProvider(
+  provider: ProviderRow,
+  messages: LLMMessage[],
+  maxTokens: number
+): Promise<{ content: string | null; lastResult: LLMCallResult | null }> {
+  const adapter = getProviderAdapter(provider.code);
+  if (!adapter) {
+    console.error(`[llm-manager] No adapter registered for provider code "${provider.code}"`);
+    return { content: null, lastResult: null };
+  }
+
+  const keys = await getActiveKeysForProvider(provider.id);
+  if (keys.length === 0) {
+    console.warn(`[llm-manager] Provider ${provider.code} has no active API keys — skipping`);
+    return { content: null, lastResult: null };
+  }
+
+  let lastResult: LLMCallResult | null = null;
+
+  for (const key of keys) {
+    const result = await adapter.call({
+      baseUrl: provider.baseUrl,
+      apiKey: key.apiKey,
+      model: provider.defaultModel,
+      messages,
+      maxTokens,
+    });
+    lastResult = result;
+
+    // Update key status in DB (async, don't block)
+    await updateKeyStatus(key.id, result).catch(() => {});
+
+    if (result.status === 'success' && result.content) {
+      console.log(`[llm-manager] Provider ${provider.code} key "${key.label}" succeeded (${result.latencyMs}ms)`);
+      return { content: result.content, lastResult: result };
+    }
+
+    console.warn(`[llm-manager] Provider ${provider.code} key "${key.label}" failed: ${result.status} (${result.httpStatus || 'n/a'}) ${result.errorCode || ''}`);
+
+    // If auth_error, key is likely invalid — don't retry same key, but continue to next
+    // If rate_limited, try next key (quota may be per-key)
+    // If network_error, try next key (maybe transient)
+    // If server_error, try next key (maybe transient)
+    // If quota_exhausted, try next key (account-level, but other key may be different account)
+    // If empty_content, try next key (different key may have different model access)
+  }
+
+  return { content: null, lastResult };
+}
+
+// ============================================================================
+// Legacy fallback — Z.ai via .z-ai-config (preserve existing behavior)
+// ============================================================================
+async function tryZaiLegacy(messages: LLMMessage[], maxTokens: number): Promise<string | null> {
+  const config = readZaiConfigFile();
+  if (!config) {
+    console.error('[llm-manager] No .z-ai-config file found (legacy path exhausted)');
+    return null;
+  }
+
+  console.log('[llm-manager] Falling back to .z-ai-config legacy path');
+  const result = await zaiAdapter.call({
+    baseUrl: config.baseUrl,
+    apiKey: config.apiKey,
+    model: 'glm-4.7-flash', // hardcoded model for legacy path (preserve old behavior)
+    messages,
+    maxTokens,
+    timeoutMs: 90000, // Z.ai free tier can take 40-78s
+  });
+
+  if (result.status === 'success' && result.content) {
+    console.log(`[llm-manager] Legacy Z.ai path succeeded (${result.latencyMs}ms)`);
+    return result.content;
+  }
+
+  console.error(`[llm-manager] Legacy Z.ai path failed: ${result.status} (${result.httpStatus || 'n/a'}) ${result.errorCode || ''}`);
+  return null;
+}
+
+// ============================================================================
+// PUBLIC ENTRY POINT — signature preserved from old callLLM
+// ============================================================================
+export async function callLLMViaManager(
+  systemPrompt: string,
+  conversationMessages: LLMMessage[],
+  maxTokens: number = 1000
+): Promise<string | null> {
+  const messages: LLMMessage[] = [
+    { role: 'system', content: systemPrompt },
+    ...conversationMessages,
+  ];
+
+  // 1. Try each active provider in DB order (priority asc)
+  const providers = await getActiveProviders();
+  if (providers.length === 0) {
+    console.log('[llm-manager] No active providers in DB — falling back to legacy Z.ai path');
+  } else {
+    console.log(`[llm-manager] Trying ${providers.length} provider(s): ${providers.map(p => p.code).join(', ')}`);
+    for (const provider of providers) {
+      const { content, lastResult } = await tryProvider(provider, messages, maxTokens);
+      if (content) {
+        return content;
+      }
+      // If provider had keys but all failed, try next provider
+      if (lastResult) {
+        console.warn(`[llm-manager] Provider ${provider.code} exhausted, trying next`);
+      }
+    }
+    console.warn('[llm-manager] All DB providers exhausted — falling back to legacy Z.ai path');
+  }
+
+  // 2. Legacy fallback: Z.ai via .z-ai-config file (preserve existing behavior)
+  return await tryZaiLegacy(messages, maxTokens);
+}

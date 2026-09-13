@@ -29,6 +29,7 @@ import {
   Sparkles, Save, Shield, Lock, Database, BookOpen, FileText, Globe,
   Settings, Sliders, AlertTriangle, CheckCircle2, XCircle,
 } from 'lucide-react';
+import { LLMConfigTab } from '@/components/assistant-llm-config-tab';
 
 // ===== Types locaux =====
 interface AssistantConfig {
@@ -213,9 +214,9 @@ export function AssistantAdminSection() {
         </p>
       </div>
 
-      {/* === Tabs 5 espaces === */}
+      {/* === Tabs 6 espaces (5 existants + Configuration IA) === */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-2 md:grid-cols-5 gap-1 h-auto">
+        <TabsList className="grid grid-cols-2 md:grid-cols-6 gap-1 h-auto">
           <TabsTrigger value="config" className="flex items-center gap-1.5 text-xs md:text-sm">
             <Settings className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Configuration</span>
           </TabsTrigger>
@@ -230,6 +231,9 @@ export function AssistantAdminSection() {
           </TabsTrigger>
           <TabsTrigger value="sources" className="flex items-center gap-1.5 text-xs md:text-sm">
             <Database className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Sources</span>
+          </TabsTrigger>
+          <TabsTrigger value="llm" className="flex items-center gap-1.5 text-xs md:text-sm">
+            <Sparkles className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Config IA</span>
           </TabsTrigger>
         </TabsList>
 
@@ -668,6 +672,11 @@ export function AssistantAdminSection() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* === Espace 6 — Configuration IA (Multi-LLM) === */}
+        <TabsContent value="llm">
+          <LLMConfigTab />
         </TabsContent>
       </Tabs>
 

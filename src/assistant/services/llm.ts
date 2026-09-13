@@ -71,6 +71,7 @@ async function callLLMDirect(
         model: 'glm-4.7-flash',
         messages,
         stream: false,
+        thinking: { type: 'disabled' },
         max_tokens: maxTokens,
       }),
     });

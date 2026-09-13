@@ -47,9 +47,39 @@ export async function callLLM(
       max_tokens: maxTokens,
     });
 
-    const reply = response?.choices?.[0]?.message?.content;
+    let reply = response?.choices?.[0]?.message?.content;
     if (reply && typeof reply === 'string' && reply.trim().length > 0) {
       return reply.trim();
+    }
+
+    // Fallback GLM-4.7-Flash : si content est vide, le modèle peut avoir
+    // besoin d un appel sans le paramètre thinking (le SDK l ajoute par défaut).
+    // Retry via fetch direct pour contourner le paramètre thinking du SDK.
+    try {
+      const config = zai?.config || {};
+      const retryRes = await fetch(`${config.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.apiKey}`,
+          'X-Z-AI-From': 'Z',
+        },
+        body: JSON.stringify({
+          model: 'glm-4.7-flash',
+          messages,
+          stream: false,
+          max_tokens: maxTokens,
+        }),
+      });
+      if (retryRes.ok) {
+        const retryData = await retryRes.json();
+        reply = retryData?.choices?.[0]?.message?.content;
+        if (reply && typeof reply === 'string' && reply.trim().length > 0) {
+          return reply.trim();
+        }
+      }
+    } catch (retryError: any) {
+      console.error('[assistant/llm] Retry sans thinking échoué:', retryError?.message || retryError);
     }
 
     console.error('[assistant/llm] Réponse vide ou malformée du LLM');

@@ -1,17 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { requireUser } from '@/lib/auth';
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ courseId: string }> }
 ) {
+  // IDOR FIX : l'identité de l'utilisateur provient exclusivement de la session
+  // serveur (cookie HMAC signé). Le paramètre `userId` n'est plus lu depuis
+  // la query string — un utilisateur ne peut accéder qu'à sa propre progression.
+  const auth = await requireUser();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const { courseId } = await params;
-    const userId = new URL(req.url).searchParams.get('userId');
-
-    if (!userId) {
-      return NextResponse.json({ error: 'Utilisateur non identifié' }, { status: 401 });
-    }
+    const userId = auth.id;
 
     const enrollment = await db.enrollment.findUnique({
       where: { userId_courseId: { userId, courseId } },

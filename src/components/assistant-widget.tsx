@@ -50,13 +50,6 @@ export function AssistantWidget() {
           const data = await res.json();
           if (mounted) {
             setStatus(data);
-            if (messages.length === 0) {
-              setMessages([{
-                role: 'assistant',
-                content: `Bonjour 👋 Je suis l'assistant de HSE Academy.\nJe peux vous aider concernant nos formations, cours en ligne et informations disponibles sur la plateforme.`,
-                ts: Date.now(),
-              }]);
-            }
           }
         }
       } catch { /* silencieux */ }
@@ -64,6 +57,28 @@ export function AssistantWidget() {
     checkStatus();
     const interval = setInterval(checkStatus, 60000);
     return () => { mounted = false; clearInterval(interval); };
+  }, []);
+
+  // ============================================================================
+  // Welcome message — set ONCE on initial mount, NEVER re-set during the session.
+  // ============================================================================
+  // Bug fix: previously this logic was inside the periodic checkStatus() above,
+  // but the closure captured `messages` from the first render (always []).
+  // Every 60s, `messages.length === 0` was true (stale closure), causing
+  // setMessages([welcome]) to WIPE the user's conversation.
+  //
+  // Now: welcome is set on mount via a SEPARATE useEffect (deps [messages] is
+  // NOT needed — we only set it once). The periodic status check no longer
+  // touches messages. Conversation is preserved indefinitely until the user
+  // closes the panel (X button preserves state via Zustand isOpen toggle).
+  // ============================================================================
+  useEffect(() => {
+    // Only set welcome if messages is still empty (first mount)
+    setMessages(prev => prev.length === 0 ? [{
+      role: 'assistant',
+      content: `Bonjour 👋 Je suis l'assistant de HSE Academy.\nJe peux vous aider concernant nos formations, cours en ligne et informations disponibles sur la plateforme.`,
+      ts: Date.now(),
+    }] : prev);
   }, []);
 
   useEffect(() => {

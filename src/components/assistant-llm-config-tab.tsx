@@ -3,18 +3,16 @@
 // ============================================================================
 // LLMConfigTab — Onglet "Configuration IA" du dashboard Assistant
 // ============================================================================
-// Permet à l'admin de gérer :
-//   - Providers (ajout / suppression / activation / priorité)
-//   - API Keys par provider (ajout illimité / suppression / activation / test)
-//   - Modèles par provider (catalogue éditable — Option C : manuel + suggérés)
-//   - Test individuel d'une clé
-//   - Vue d'ensemble du statut (healthy / degraded / down)
-//
-// SÉCURITÉ :
-//   - L'API key n'est JAMAIS affichée (seul keyHint "****ABCD" est visible)
-//   - Le champ apiKey n'est JAMAIS retourné par les routes GET
-//   - POST/PATCH/DELETE toutes requireAdmin() côté serveur
-//   - Le formulaire d'ajout utilise type="password" pour éviter le shoulder-surfing
+// UX simplifiée (revision post-mission):
+//   - Bouton unique "Ajouter une API" : ouvre un formulaire minimal
+//     (preset provider + clé API + label optionnel)
+//   - Le système auto-crée le provider si nécessaire en utilisant les
+//     détails techniques du preset (baseUrl, adapter, defaultModel)
+//   - L'admin n'a PAS à connaître baseUrl/adapter/etc.
+//   - L'API key n'est JAMAIS affichée après sauvegarde (seul keyHint "****ABCD")
+//   - Multi-clés par provider (illimité)
+//   - Test individuel de chaque clé + test global par provider
+//   - Health status visible (healthy/degraded/down/unknown)
 // ============================================================================
 
 import { useState, useEffect, useCallback } from 'react';
@@ -32,7 +30,7 @@ import {
 } from '@/components/ui/select';
 import {
   Sparkles, Plus, Trash2, TestTube, Loader2, AlertCircle, CheckCircle2,
-  ChevronUp, ChevronDown, Key, Cpu, Activity,
+  ChevronUp, ChevronDown, Key, Activity,
 } from 'lucide-react';
 
 // ===== Types =====
@@ -90,20 +88,16 @@ export function LLMConfigTab() {
   const [registeredAdapters, setRegisteredAdapters] = useState<Record<string, boolean>>({});
   const [apiKeys, setApiKeys] = useState<ApiKey[] | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showAddProvider, setShowAddProvider] = useState(false);
-  const [showAddKeyFor, setShowAddKeyFor] = useState<string | null>(null);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [testingKeyId, setTestingKeyId] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
 
-  // Form state for new provider
-  const [newProvider, setNewProvider] = useState({
-    code: '', displayName: '', adapter: 'openai_compatible',
-    baseUrl: '', defaultModel: '', priority: 10,
-  });
-  // Form state for new API key
-  const [newKey, setNewKey] = useState({
-    providerId: '', label: '', apiKey: '', priority: 10,
+  // === Quick-add form state (SIMPLIFIED) ===
+  // Admin only needs: preset code (select) + API key (password) + optional label + optional priority
+  // All technical details (baseUrl, adapter, defaultModel) are auto-filled server-side
+  const [quickAdd, setQuickAdd] = useState({
+    code: '', apiKey: '', label: '', priority: 10,
   });
 
   const fetchProviders = useCallback(async () => {
@@ -146,45 +140,41 @@ export function LLMConfigTab() {
 
   // ===== Handlers =====
 
-  async function handleCreateProvider() {
-    if (!newProvider.code || !newProvider.displayName || !newProvider.baseUrl || !newProvider.defaultModel) {
-      toast.error('Tous les champs sont requis');
+  // === Quick-add API key (simplified UX) ===
+  async function handleQuickAdd() {
+    if (!quickAdd.code || !quickAdd.apiKey) {
+      toast.error('Sélectionnez un provider et collez votre clé API');
       return;
     }
-    setSavingId('new-provider');
+    setSavingId('quick-add');
     try {
-      const res = await fetch('/api/assistant/llm/providers', {
+      const res = await fetch('/api/assistant/llm/api-keys/quick-add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...newProvider,
-          availableModels: [], // start with empty list
+          code: quickAdd.code,
+          apiKey: quickAdd.apiKey,
+          label: quickAdd.label || undefined,
+          priority: quickAdd.priority,
         }),
       });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error || 'Erreur');
       }
-      toast.success(`Provider "${newProvider.displayName}" ajouté`);
-      setNewProvider({ code: '', displayName: '', adapter: 'openai_compatible', baseUrl: '', defaultModel: '', priority: 10 });
-      setShowAddProvider(false);
+      const data = await res.json();
+      toast.success(`Clé API ajoutée pour ${data.provider.displayName}`, {
+        description: `Modèle par défaut : ${data.provider.defaultModel} • Clé ••••${data.apiKey.keyHint}`,
+      });
+      // Reset form
+      setQuickAdd({ code: '', apiKey: '', label: '', priority: 10 });
+      setShowQuickAdd(false);
       await reload();
     } catch (e: any) {
-      toast.error('Erreur création provider', { description: e.message });
+      toast.error('Erreur création clé', { description: e.message });
     } finally {
       setSavingId(null);
     }
-  }
-
-  async function handlePresetSelect(preset: Preset) {
-    setNewProvider({
-      code: preset.code,
-      displayName: preset.displayName,
-      adapter: preset.adapter,
-      baseUrl: preset.baseUrl,
-      defaultModel: preset.defaultModel,
-      priority: 10,
-    });
   }
 
   async function handleDeleteProvider(id: string, code: string) {
@@ -244,33 +234,6 @@ export function LLMConfigTab() {
       await reload();
     } catch (e: any) {
       toast.error('Erreur', { description: e.message });
-    }
-  }
-
-  async function handleCreateKey() {
-    if (!newKey.providerId || !newKey.label || !newKey.apiKey) {
-      toast.error('Tous les champs sont requis');
-      return;
-    }
-    setSavingId('new-key');
-    try {
-      const res = await fetch('/api/assistant/llm/api-keys', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newKey),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Erreur');
-      }
-      toast.success('Clé API ajoutée');
-      setNewKey({ providerId: '', label: '', apiKey: '', priority: 10 });
-      setShowAddKeyFor(null);
-      await reload();
-    } catch (e: any) {
-      toast.error('Erreur création clé', { description: e.message });
-    } finally {
-      setSavingId(null);
     }
   }
 
@@ -363,7 +326,7 @@ export function LLMConfigTab() {
           <Sparkles className="h-4 w-4" /> Configuration IA — Multi-LLM Providers
         </CardTitle>
         <p className="text-xs text-slate-500 mt-1">
-          Gérez les providers (Groq, Z.ai, OpenAI, ...) et leurs API keys. Failover automatique par priorité.
+          Ajoutez vos clés API (Groq, Z.ai, OpenAI, Anthropic, ...). Failover automatique par priorité.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -390,83 +353,109 @@ export function LLMConfigTab() {
           </div>
         )}
 
-        {/* === Add provider button === */}
+        {/* === Quick-add API button === */}
         <div className="flex justify-end">
-          <Button size="sm" onClick={() => setShowAddProvider(!showAddProvider)} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-            <Plus className="h-4 w-4" /> Ajouter provider
+          <Button size="sm" onClick={() => setShowQuickAdd(!showQuickAdd)} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+            <Plus className="h-4 w-4" /> Ajouter une API
           </Button>
         </div>
 
-        {/* === Add provider form === */}
-        {showAddProvider && (
+        {/* === Quick-add form (SIMPLIFIED — admin only sees provider preset + API key) === */}
+        {showQuickAdd && (
           <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-3">
             <div className="flex items-center gap-2 text-sm font-semibold">
-              <Cpu className="h-4 w-4" /> Nouveau provider
-            </div>
-
-            {/* Presets */}
-            <div className="flex flex-wrap gap-2">
-              <span className="text-xs text-slate-500 self-center">Presets :</span>
-              {presets.map(p => (
-                <Button key={p.code} size="sm" variant="outline" onClick={() => handlePresetSelect(p)} className="text-xs h-7">
-                  {p.displayName}
-                </Button>
-              ))}
+              <Key className="h-4 w-4" /> Ajouter une clé API
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs">Code (lettres minuscules)</Label>
-                <Input value={newProvider.code} onChange={e => setNewProvider(p => ({ ...p, code: e.target.value }))} placeholder="groq" className="text-sm" />
-              </div>
-              <div>
-                <Label className="text-xs">Nom affiché</Label>
-                <Input value={newProvider.displayName} onChange={e => setNewProvider(p => ({ ...p, displayName: e.target.value }))} placeholder="Groq" className="text-sm" />
-              </div>
-              <div className="md:col-span-2">
-                <Label className="text-xs">Base URL</Label>
-                <Input value={newProvider.baseUrl} onChange={e => setNewProvider(p => ({ ...p, baseUrl: e.target.value }))} placeholder="https://api.groq.com/openai/v1" className="text-sm" />
-              </div>
-              <div>
-                <Label className="text-xs">Adapter</Label>
-                <Select value={newProvider.adapter} onValueChange={v => setNewProvider(p => ({ ...p, adapter: v }))}>
-                  <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+                <Label className="text-xs">Fournisseur</Label>
+                <Select value={quickAdd.code} onValueChange={v => setQuickAdd(p => ({ ...p, code: v }))}>
+                  <SelectTrigger className="text-sm"><SelectValue placeholder="Sélectionner un fournisseur…" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="openai_compatible">OpenAI-compatible (Groq, OpenAI, DeepSeek, Mistral)</SelectItem>
-                    <SelectItem value="zai_native">Z.ai natif (glm-4.x, glm-5.x)</SelectItem>
+                    {presets.map(p => {
+                      const isRegistered = !!registeredAdapters[p.code];
+                      return (
+                        <SelectItem key={p.code} value={p.code}>
+                          {p.displayName}{!isRegistered && ' (adapter manquant)'}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Le système remplit automatiquement les détails techniques (base URL, adapter, modèles disponibles).
+                </p>
               </div>
               <div>
-                <Label className="text-xs">Modèle par défaut</Label>
-                <Input value={newProvider.defaultModel} onChange={e => setNewProvider(p => ({ ...p, defaultModel: e.target.value }))} placeholder="llama-3.3-70b-versatile" className="text-sm" />
+                <Label className="text-xs">API Key</Label>
+                <Input
+                  type="password"
+                  value={quickAdd.apiKey}
+                  onChange={e => setQuickAdd(p => ({ ...p, apiKey: e.target.value }))}
+                  placeholder="Collez votre clé API ici…"
+                  className="text-sm font-mono"
+                />
+                <p className="text-[10px] text-amber-700 mt-1">
+                  ⚠ La clé sera stockée côté serveur et ne sera <strong>JAMAIS</strong> réaffichée. Seuls les 4 derniers caractères seront visibles.
+                </p>
               </div>
               <div>
-                <Label className="text-xs">Priorité (1=highest)</Label>
-                <Input type="number" min={1} max={100} value={newProvider.priority} onChange={e => setNewProvider(p => ({ ...p, priority: parseInt(e.target.value) || 10 }))} className="text-sm" />
+                <Label className="text-xs">Nom (optionnel)</Label>
+                <Input
+                  value={quickAdd.label}
+                  onChange={e => setQuickAdd(p => ({ ...p, label: e.target.value }))}
+                  placeholder="Ex : Production, Dev, Backup…"
+                  className="text-sm"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Priorité (1=highest, 10=défaut)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={quickAdd.priority}
+                  onChange={e => setQuickAdd(p => ({ ...p, priority: parseInt(e.target.value) || 10 }))}
+                  className="text-sm"
+                />
               </div>
             </div>
 
+            {/* Show preset technical preview (read-only, admin can see what will be configured) */}
+            {quickAdd.code && (
+              <div className="p-2 bg-white border border-slate-200 rounded text-[10px] text-slate-600">
+                {(() => {
+                  const preset = presets.find(p => p.code === quickAdd.code);
+                  if (!preset) return null;
+                  return (
+                    <div>
+                      <strong>Sera configuré automatiquement :</strong>
+                      <span className="font-mono ml-1">{preset.baseUrl}</span>
+                      <span className="ml-2">•</span>
+                      <span className="ml-2">Modèle par défaut : <code>{preset.defaultModel}</code></span>
+                      <span className="ml-2">•</span>
+                      <span className="ml-2">{preset.availableModels.length} modèles disponibles</span>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
             <div className="flex justify-end gap-2">
-              <Button size="sm" variant="outline" onClick={() => setShowAddProvider(false)}>Annuler</Button>
-              <Button size="sm" onClick={handleCreateProvider} disabled={savingId === 'new-provider'} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-                {savingId === 'new-provider' ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                Créer
+              <Button size="sm" variant="outline" onClick={() => setShowQuickAdd(false)}>Annuler</Button>
+              <Button size="sm" onClick={handleQuickAdd} disabled={savingId === 'quick-add' || !quickAdd.code || !quickAdd.apiKey} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                {savingId === 'quick-add' ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Enregistrer la clé
               </Button>
             </div>
-            {newProvider.code && !registeredAdapters[newProvider.code] && (
-              <p className="text-xs text-amber-700 flex items-center gap-1">
-                <AlertCircle className="h-3.5 w-3.5" />
-                Code "{newProvider.code}" non enregistré dans le registry — l'appel échouera tant que l'adapter n'est pas implémenté dans <code>src/assistant/providers/{newProvider.code}.ts</code> et enregistré dans <code>registry.ts</code>.
-              </p>
-            )}
           </div>
         )}
 
         {/* === Providers list === */}
         {providers && providers.length === 0 && (
           <div className="p-6 text-center text-sm text-slate-500 border border-dashed border-slate-300 rounded-lg">
-            Aucun provider configuré. Lara Bot utilise actuellement le fallback Z.ai via <code>.z-ai-config</code>. Ajoutez un provider pour activer le multi-LLM.
+            Aucun provider configuré. Lara Bot utilise actuellement le fallback Z.ai via <code>.z-ai-config</code>. Cliquez sur « Ajouter une API » pour activer le multi-LLM.
           </div>
         )}
 
@@ -522,14 +511,10 @@ export function LLMConfigTab() {
                   </div>
                 </div>
 
-                {/* Provider config */}
-                <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                {/* Provider config — HIDDEN Base URL (admin doesn't need to see it) */}
+                <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                   <div>
-                    <Label className="text-[10px] text-slate-500 uppercase tracking-wider">Base URL</Label>
-                    <div className="font-mono text-slate-700 break-all">{provider.baseUrl}</div>
-                  </div>
-                  <div>
-                    <Label className="text-[10px] text-slate-500 uppercase tracking-wider">Modèle</Label>
+                    <Label className="text-[10px] text-slate-500 uppercase tracking-wider">Modèle actif</Label>
                     <Select value={provider.defaultModel} onValueChange={v => handleUpdateProviderModel(provider.id, v)}>
                       <SelectTrigger className="text-xs h-7"><SelectValue /></SelectTrigger>
                       <SelectContent>
@@ -564,46 +549,13 @@ export function LLMConfigTab() {
 
               {/* API Keys section for this provider */}
               <div className="p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-sm font-semibold flex items-center gap-1.5">
-                    <Key className="h-3.5 w-3.5" /> API Keys ({keys.length})
-                  </h4>
-                  <Button size="sm" variant="outline" onClick={() => setShowAddKeyFor(showAddKeyFor === provider.id ? null : provider.id)} className="text-xs h-7">
-                    <Plus className="h-3.5 w-3.5" /> Ajouter
-                  </Button>
-                </div>
-
-                {/* Add key form */}
-                {showAddKeyFor === provider.id && (
-                  <div className="mb-3 p-3 bg-slate-50 border border-slate-200 rounded space-y-2">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                      <div>
-                        <Label className="text-xs">Nom (label)</Label>
-                        <Input value={newKey.label} onChange={e => setNewKey(k => ({ ...k, label: e.target.value }))} placeholder="Groq Production 1" className="text-sm h-8" />
-                      </div>
-                      <div>
-                        <Label className="text-xs">API Key</Label>
-                        <Input type="password" value={newKey.apiKey} onChange={e => setNewKey(k => ({ ...k, apiKey: e.target.value }))} placeholder="gsk_..." className="text-sm h-8 font-mono" />
-                      </div>
-                      <div>
-                        <Label className="text-xs">Priorité</Label>
-                        <Input type="number" min={1} max={100} value={newKey.priority} onChange={e => setNewKey(k => ({ ...k, priority: parseInt(e.target.value) || 10 }))} className="text-sm h-8" />
-                      </div>
-                    </div>
-                    <div className="flex justify-end gap-2">
-                      <Button size="sm" variant="outline" onClick={() => setShowAddKeyFor(null)} className="h-7 text-xs">Annuler</Button>
-                      <Button size="sm" onClick={() => { setNewKey(k => ({ ...k, providerId: provider.id })); setTimeout(handleCreateKey, 0); }} disabled={savingId === 'new-key'} className="bg-emerald-600 hover:bg-emerald-700 text-white h-7 text-xs">
-                        {savingId === 'new-key' ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
-                        Enregistrer
-                      </Button>
-                    </div>
-                    <p className="text-[10px] text-amber-700">⚠ La clé sera stockée en DB et ne sera JAMAIS réaffichée. Seuls les 4 derniers caractères seront visibles.</p>
-                  </div>
-                )}
+                <h4 className="text-sm font-semibold flex items-center gap-1.5 mb-2">
+                  <Key className="h-3.5 w-3.5" /> API Keys ({keys.length})
+                </h4>
 
                 {/* Keys list */}
                 {keys.length === 0 ? (
-                  <p className="text-xs text-slate-500 italic">Aucune clé. Ajoutez-en une pour activer ce provider.</p>
+                  <p className="text-xs text-slate-500 italic">Aucune clé. Cliquez sur « Ajouter une API » en haut pour en ajouter une.</p>
                 ) : (
                   <div className="space-y-1.5">
                     {keys.map(k => {
@@ -611,7 +563,8 @@ export function LLMConfigTab() {
                       const keyTest = testResults[`key-${k.id}`];
                       return (
                         <div key={k.id} className="flex flex-wrap items-center gap-2 p-2 bg-white border border-slate-200 rounded text-xs">
-                          <span className="font-mono text-slate-500">****{k.keyHint}</span>
+                          {/* Display: Groq • ••••ABCD • Label • Status • P# • last success/error */}
+                          <span className="font-mono text-slate-500">••••{k.keyHint}</span>
                           <span className="font-medium">{k.label}</span>
                           <Badge className={`text-[10px] ${statusInfo.color}`}>{statusInfo.label}</Badge>
                           <span className="text-slate-500">P{k.priority}</span>

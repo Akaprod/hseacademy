@@ -16,7 +16,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       },
     });
 
-    if (!article) {
+    // M-5 (Security Batch 1) — Draft article disclosure.
+    // Ne jamais retourner un article dont published === false via la route publique.
+    // findUnique garde l'optimisation de l'index unique sur slug, puis on filtre
+    // explicitement pour préserver l'include structure (category + comments).
+    if (!article || !article.published) {
       return NextResponse.json({ error: 'Article non trouvé' }, { status: 404 });
     }
 

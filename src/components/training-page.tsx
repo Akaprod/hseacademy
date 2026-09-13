@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
+import rehypeSanitize from 'rehype-sanitize';
 import remarkGfm from 'remark-gfm';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -837,8 +838,18 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
               </div>
 
               {/* Chapter content */}
+              {/* M-2 (Security Batch 1) — rehype-sanitize appliqué APRÈS rehypeRaw
+                  pour neutraliser <script>, on* handlers, javascript: URLs, etc.
+                  Le contenu vient de champs admin-contrôlés mais reste défensif
+                  contre une compromission ou un copier-coller malicieux.
+                  Le schéma par défaut de rehype-sanitize est déjà strict. */}
               <div className="prose max-w-none">
-                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{ch.content || 'Contenu en cours de rédaction...'}</ReactMarkdown>
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[rehypeRaw, rehypeSanitize]}
+                >
+                  {ch.content || 'Contenu en cours de rédaction...'}
+                </ReactMarkdown>
               </div>
 
               {/* Exam section */}

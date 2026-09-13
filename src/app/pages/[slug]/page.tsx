@@ -16,8 +16,22 @@ import { notFound } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
+import rehypeSanitize from 'rehype-sanitize';
 import { db } from '@/lib/db';
 import { ArrowLeft, ArrowRight, BookOpen, Calendar, ChevronRight, ShieldCheck } from 'lucide-react';
+
+// ============================================================================
+// M-1 (Security Batch 1) — JSON-LD XSS protection.
+// ============================================================================
+// `JSON.stringify()` n'échappe pas la séquence `</script>`. Un champ
+// admin-contrôlé (titre, FAQ, etc.) injecté dans un tag <script type="...">
+// via `dangerouslySetInnerHTML` pouvait casser le tag et exécuter du JS
+// arbitraire côté visiteur. On neutralise tout `<` en `\u003c` pour empêcher
+// la fermeture prématurée du tag script.
+// ============================================================================
+function safeJsonLdHtml(obj: unknown): string {
+  return JSON.stringify(obj).replace(/</g, '\\u003c');
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -157,8 +171,8 @@ export default async function PublicPageView({ params }: { params: Promise<{ slu
 
   return (
     <article className="space-y-8">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleLd) }} />
-      {faqLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }} />}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLdHtml(articleLd) }} />
+      {faqLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLdHtml(faqLd) }} />}
 
       {/* Breadcrumb */}
       <nav className="text-sm text-slate-500 flex items-center gap-1.5 flex-wrap" aria-label="Fil d'Ariane">
@@ -219,7 +233,20 @@ export default async function PublicPageView({ params }: { params: Promise<{ slu
           double, ce qui est mauvais pour le SEO). */}
       <div className="bg-white border border-slate-200 rounded-xl px-6 py-8 sm:px-10 sm:py-12">
         <div className="prose prose-slate max-w-none prose-headings:scroll-mt-20 prose-h2:text-xl prose-h2:mt-8 prose-h2:mb-3 prose-h2:font-bold prose-h2:text-slate-900 prose-h3:text-lg prose-h3:mt-5 prose-h3:mb-2 prose-h3:font-semibold prose-h3:text-slate-800 prose-p:leading-relaxed prose-a:text-emerald-700 prose-a:underline-offset-2 hover:prose-a:text-emerald-800 prose-strong:text-slate-900 prose-ul:my-4 prose-ol:my-4 prose-li:my-1 prose-code:bg-slate-100 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none prose-blockquote:border-emerald-300 prose-blockquote:bg-emerald-50/40 prose-blockquote:py-2 prose-blockquote:px-4">
-          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[
+              rehypeRaw,
+              // M-2 (Security Batch 1) — sanitize le HTML parsé par rehypeRaw.
+              // Le schéma par défaut de rehype-sanitize (basé sur GitHub)
+              // interdit déjà : <script>, <iframe>, <object>, <embed>,
+              // tous les handlers on*, les URLs javascript:, etc.
+              // Le contenu vient de champs admin-contrôlés mais reste défensif
+              // contre une compromission de compte admin ou un copier-coller
+              // malicieux.
+              rehypeSanitize,
+            ]}
+          >
             {page.content.replace(/^#\s+.+\n?/, '')}
           </ReactMarkdown>
         </div>

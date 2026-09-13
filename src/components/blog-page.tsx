@@ -11,6 +11,7 @@ import { ArrowLeft, Eye, Clock, MessageCircle, Search, Tag, Send, BookOpen } fro
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
+import rehypeSanitize from 'rehype-sanitize';
 import remarkGfm from 'remark-gfm';
 
 interface BlogPageProps {
@@ -151,7 +152,17 @@ export default function BlogPage({ slug, user, onAuthOpen, onNavigate }: BlogPag
               <Card className="border-slate-200 mb-8">
                 <CardContent className="p-6 md:p-10">
                   <div className="prose max-w-none">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{selectedArticle.content}</ReactMarkdown>
+                    {/* M-2 (Security Batch 1) — rehype-sanitize appliqué APRÈS rehypeRaw
+                        pour neutraliser <script>, on* handlers, javascript: URLs, etc.
+                        Le contenu vient de champs admin-contrôlés mais reste défensif
+                        contre une compromission ou un copier-coller malicieux.
+                        Le schéma par défaut de rehype-sanitize est déjà strict. */}
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      rehypePlugins={[rehypeRaw, rehypeSanitize]}
+                    >
+                      {selectedArticle.content}
+                    </ReactMarkdown>
                   </div>
                 </CardContent>
               </Card>

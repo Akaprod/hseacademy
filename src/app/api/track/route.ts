@@ -1,6 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { createHmac } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
+
+// M-6 (Security Batch 1) — Suppression du fallback AUTH_SECRET hardcodé.
+// On applique le même niveau de sécurité que src/lib/auth.ts :
+//   - En production : AUTH_SECRET doit être >= 32 chars (sinon fail-closed,
+//     la visite n'est pas enregistrée — aucune fuite d'IP en clair).
+//   - En dev : secret éphémère non persistant (jamais le fallback hardcodé).
+// Aucune nouvelle valeur de secret n'est générée pour la prod — AUTH_SECRET
+// reste strictement lu depuis process.env.AUTH_SECRET (non modifié).
+const TRACK_SECRET = (() => {
+  const raw = process.env.AUTH_SECRET;
+  if (raw && raw.length >= 32) return raw;
+  if (process.env.NODE_ENV === 'production') return null;
+  // dev-only : éphémère, régénéré à chaque boot du process (jamais persisté)
+  return randomBytes(32).toString('hex');
+})();
 
 // POST /api/track — enregistre une visite
 // Body: { path, pageType, sessionId }
@@ -33,9 +48,15 @@ export async function POST(request: NextRequest) {
     }
 
     // --- IP hash (privacy) ---
+    // M-6 : plus aucun fallback hardcodé. Si TRACK_SECRET est null (prod sans
+    // AUTH_SECRET valide), on fail-closed : la visite n'est PAS enregistrée
+    // (réponse 200 sans erreur côté visiteur, mais rien n'est écrit en DB).
     const rawIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || '0.0.0.0';
-    const secret = process.env.AUTH_SECRET || 'fallback-secret-for-hashing';
-    const ipHash = createHmac('sha256', secret).update(rawIp).digest('hex').slice(0, 32); // truncated hash
+    if (!TRACK_SECRET) {
+      // Fail-closed silencieux côté visiteur — pas d'IP hashée avec un secret faible.
+      return NextResponse.json({ success: false }, { status: 200 });
+    }
+    const ipHash = createHmac('sha256', TRACK_SECRET).update(rawIp).digest('hex').slice(0, 32); // truncated hash
 
     // --- User Agent ---
     const userAgent = request.headers.get('user-agent') || null;

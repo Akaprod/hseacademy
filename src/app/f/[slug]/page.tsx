@@ -20,6 +20,19 @@ import {
   CalendarDays, FileCheck, Star,
 } from 'lucide-react';
 
+// ============================================================================
+// M-1 (Security Batch 1) — JSON-LD XSS protection.
+// ============================================================================
+// `JSON.stringify()` n'échappe pas la séquence `</script>`. Un champ
+// admin-contrôlé (titre, SEO description, etc.) injecté dans un tag
+// <script type="application/ld+json"> via `dangerouslySetInnerHTML` pouvait
+// casser le tag et exécuter du JS arbitraire côté visiteur. On neutralise
+// tout `<` en `\u003c` pour empêcher la fermeture prématurée du tag script.
+// ============================================================================
+function safeJsonLdHtml(obj: unknown): string {
+  return JSON.stringify(obj).replace(/</g, '\\u003c');
+}
+
 // Next.js 16 + Turbopack : utiliser `revalidate = 0` au lieu de `force-dynamic`
 // (force-dynamic peut causer "getVaryParamsAccumulator is not a function")
 export const revalidate = 0;
@@ -331,9 +344,9 @@ export default async function FormationSeoPage({ params }: { params: Promise<{ s
   return (
     <article className="space-y-8">
       {/* JSON-LD scripts — toujours en premier dans le <article> */}
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(courseLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLdHtml(courseLd) }} />
       {credentialLd && (
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(credentialLd) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLdHtml(credentialLd) }} />
       )}
 
       {/* Breadcrumb */}

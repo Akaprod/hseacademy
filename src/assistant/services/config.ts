@@ -1,4 +1,7 @@
 // Service — Configuration (singleton) — Phase 1 + Phase 2
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { homedir } from 'node:os';
 import { db } from '@/lib/db';
 import type { AssistantConfigData, AssistantStatus } from '../types';
 import { SYSTEM_SAFETY_VERSION } from '../instructions/system-safety';
@@ -42,6 +45,33 @@ export async function updateConfig(
   return rowToConfig(updated);
 }
 
+// ============================================================================
+// checkAiProviderConfigured — vérification légère (sans appel LLM)
+// ============================================================================
+// Vérifie si un fichier .z-ai-config valide existe dans l'un des 3 chemins
+// recherchés par le SDK (cwd, home, /etc/). Retourne true si baseUrl + apiKey
+// sont présents et non vides. Aucun secret n'est exposé — seul un booléen.
+// ============================================================================
+function checkAiProviderConfigured(): boolean {
+  const configPaths = [
+    join(process.cwd(), '.z-ai-config'),
+    join(homedir(), '.z-ai-config'),
+    '/etc/.z-ai-config',
+  ];
+  for (const filePath of configPaths) {
+    try {
+      const content = readFileSync(filePath, 'utf-8');
+      const config = JSON.parse(content);
+      if (config.baseUrl && config.apiKey) {
+        return true;
+      }
+    } catch {
+      // Fichier absent ou invalide — passer au suivant
+    }
+  }
+  return false;
+}
+
 export async function getStatus(): Promise<AssistantStatus> {
   const config = await getConfig();
   return {
@@ -52,7 +82,7 @@ export async function getStatus(): Promise<AssistantStatus> {
       user: config.userEnabled,
       admin: config.adminEnabled,
     },
-    aiProviderConfigured: false, // Phase 2 : toujours false
+    aiProviderConfigured: checkAiProviderConfigured(),
     version: SYSTEM_SAFETY_VERSION,
   };
 }

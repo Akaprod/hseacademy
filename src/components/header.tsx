@@ -28,9 +28,11 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
+import { useAssistantStore } from '@/stores/assistant-store';
 import {
   GraduationCap, Menu, Phone, Mail, Shield, BookOpen, Award, FileCheck,
   ChevronDown, Settings, User, FileText, Lock, LogOut, Wallet, Inbox,
+  Sparkles,
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -207,9 +209,20 @@ export default function Header({ currentPage, onNavigate, onAuthOpen, user, onLo
           </nav>
 
           {/* ============================================================ */}
-          {/* Right side — Account menu                                     */}
+          {/* Right side — Agent IA button + Account menu                   */}
           {/* ============================================================ */}
           <div className="flex items-center gap-2">
+            {/* Agent IA button — ouvre le panneau de conversation */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => useAssistantStore.getState().setOpen(true)}
+              className="hidden md:flex items-center gap-1.5 text-slate-700 hover:text-emerald-700 hover:bg-emerald-50"
+              aria-label="Ouvrir l'Assistant IA"
+            >
+              <Sparkles className="h-4 w-4" />
+              <span className="text-sm font-medium">Agent</span>
+            </Button>
             {user ? (
               /* ====== DESKTOP: Unified account dropdown ====== */
               <DropdownMenu open={accountMenuOpen} onOpenChange={setAccountMenuOpen}>

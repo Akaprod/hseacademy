@@ -10,8 +10,9 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { X, Send, MessageCircle, Sparkles } from 'lucide-react';
+import { X, Send, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAssistantStore } from '@/stores/assistant-store';
 
 interface Message { role: 'user' | 'assistant'; content: string; ts: number; }
 interface Status {
@@ -30,7 +31,7 @@ const SUGGESTIONS = [
 ];
 
 export function AssistantWidget() {
-  const [open, setOpen] = useState(false);
+  const { isOpen, setOpen } = useAssistantStore();
   const [status, setStatus] = useState<Status | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -49,7 +50,7 @@ export function AssistantWidget() {
           const data = await res.json();
           if (mounted) {
             setStatus(data);
-            if (data.enabled && messages.length === 0) {
+            if (messages.length === 0) {
               setMessages([{
                 role: 'assistant',
                 content: `Bonjour 👋 Je suis l'assistant de HSE Academy.\nJe peux vous aider concernant nos formations, cours en ligne et informations disponibles sur la plateforme.`,
@@ -69,7 +70,7 @@ export function AssistantWidget() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages]);
 
-  if (!status || !status.enabled) return null;
+  if (!isOpen) return null;
 
   const handleSend = async (text?: string) => {
     const trimmed = (text || input).trim();
@@ -131,17 +132,7 @@ export function AssistantWidget() {
 
   return (
     <>
-      {!open && (
-        <button
-          onClick={() => setOpen(true)}
-          aria-label={`Ouvrir ${status.name}`}
-          className="fixed bottom-5 right-5 z-50 w-14 h-14 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xl flex items-center justify-center transition-all hover:scale-105 cursor-pointer group"
-        >
-          <MessageCircle className="h-6 w-6 group-hover:scale-110 transition-transform" />
-          <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-400 rounded-full border-2 border-white animate-pulse" />
-        </button>
-      )}
-      {open && (
+      {isOpen && (
         <div className="fixed bottom-5 right-5 z-50 w-[calc(100vw-2.5rem)] sm:w-96 max-h-[600px] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200">
           {/* Header */}
           <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-4 py-3 flex items-center justify-between shrink-0">
@@ -150,7 +141,7 @@ export function AssistantWidget() {
                 <Sparkles className="h-4 w-4" />
               </div>
               <div>
-                <p className="font-semibold text-sm leading-tight">{status.name}</p>
+                <p className="font-semibold text-sm leading-tight">{status?.name || 'Assistant'}</p>
                 <p className="text-[10px] text-emerald-100 leading-tight">HSE Academy · Lecture seule</p>
               </div>
             </div>

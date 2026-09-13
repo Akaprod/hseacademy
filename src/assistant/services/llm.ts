@@ -7,6 +7,9 @@
 // ============================================================================
 
 import ZAI from 'z-ai-web-dev-sdk';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { homedir } from 'node:os';
 
 // Singleton — on crée l'instance ZAI une seule fois
 let zaiInstance: any = null;
@@ -18,9 +21,75 @@ async function getZAI(): Promise<any> {
   return zaiInstance;
 }
 
+// ============================================================================
+// readConfigDirect — lit .z-ai-config via readFileSync (sync, fiable en CageFS)
+// ============================================================================
+// Le SDK utilise fs/promises.readFile (async) qui peut échouer en CageFS.
+// Cette fonction utilise readFileSync (sync) — même approche que
+// checkAiProviderConfigured() dans config.ts — qui fonctionne en CageFS.
+// ============================================================================
+function readConfigDirect(): { baseUrl: string; apiKey: string } | null {
+  const configPaths = [
+    join(process.cwd(), '.z-ai-config'),
+    join(homedir(), '.z-ai-config'),
+    '/etc/.z-ai-config',
+  ];
+  for (const filePath of configPaths) {
+    try {
+      const content = readFileSync(filePath, 'utf-8');
+      const config = JSON.parse(content);
+      if (config.baseUrl && config.apiKey) {
+        return { baseUrl: config.baseUrl, apiKey: config.apiKey };
+      }
+    } catch {
+      // Fichier absent ou invalide — passer au suivant
+    }
+  }
+  return null;
+}
+
 export interface LLMMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
+}
+
+// === Appel direct via fetch (contourne le SDK) ===
+async function callLLMDirect(
+  config: { baseUrl: string; apiKey: string },
+  messages: LLMMessage[],
+  maxTokens: number
+): Promise<string | null> {
+  try {
+    const res = await fetch(`${config.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey}`,
+        'X-Z-AI-From': 'Z',
+      },
+      body: JSON.stringify({
+        model: 'glm-4.7-flash',
+        messages,
+        stream: false,
+        max_tokens: maxTokens,
+      }),
+    });
+    if (!res.ok) {
+      const errorBody = await res.text();
+      console.error(`[assistant/llm] Direct call failed: ${res.status}: ${errorBody.slice(0, 200)}`);
+      return null;
+    }
+    const data = await res.json();
+    const reply = data?.choices?.[0]?.message?.content;
+    if (reply && typeof reply === 'string' && reply.trim().length > 0) {
+      return reply.trim();
+    }
+    console.error('[assistant/llm] Direct call: réponse vide');
+    return null;
+  } catch (error: any) {
+    console.error('[assistant/llm] Direct call error:', error?.message || error);
+    return null;
+  }
 }
 
 // === Appel principal au LLM ===
@@ -31,15 +100,14 @@ export async function callLLM(
   conversationMessages: LLMMessage[],
   maxTokens: number = 1000
 ): Promise<string | null> {
+  const messages: LLMMessage[] = [
+    { role: 'system', content: systemPrompt },
+    ...conversationMessages,
+  ];
+
+  // --- Tentative 1: via SDK z-ai-web-dev-sdk ---
   try {
     const zai = await getZAI();
-
-    // Construction des messages : system d'abord, puis conversation
-    const messages: LLMMessage[] = [
-      { role: 'system', content: systemPrompt },
-      ...conversationMessages,
-    ];
-
     const response = await zai.chat.completions.create({
       messages,
       stream: false,
@@ -47,48 +115,28 @@ export async function callLLM(
       max_tokens: maxTokens,
     });
 
-    let reply = response?.choices?.[0]?.message?.content;
+    const reply = response?.choices?.[0]?.message?.content;
     if (reply && typeof reply === 'string' && reply.trim().length > 0) {
       return reply.trim();
     }
-
-    // Fallback GLM-4.7-Flash : si content est vide, le modèle peut avoir
-    // besoin d un appel sans le paramètre thinking (le SDK l ajoute par défaut).
-    // Retry via fetch direct pour contourner le paramètre thinking du SDK.
-    try {
-      const config = zai?.config || {};
-      const retryRes = await fetch(`${config.baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.apiKey}`,
-          'X-Z-AI-From': 'Z',
-        },
-        body: JSON.stringify({
-          model: 'glm-4.7-flash',
-          messages,
-          stream: false,
-          max_tokens: maxTokens,
-        }),
-      });
-      if (retryRes.ok) {
-        const retryData = await retryRes.json();
-        reply = retryData?.choices?.[0]?.message?.content;
-        if (reply && typeof reply === 'string' && reply.trim().length > 0) {
-          return reply.trim();
-        }
-      }
-    } catch (retryError: any) {
-      console.error('[assistant/llm] Retry sans thinking échoué:', retryError?.message || retryError);
-    }
-
-    console.error('[assistant/llm] Réponse vide ou malformée du LLM');
-    return null;
-  } catch (error: any) {
-    // Ne JAMAIS exposer l'erreur interne au client
-    console.error('[assistant/llm] Erreur LLM:', error?.message || error);
-    return null;
+    // Si content vide, passer à la tentative 2
+  } catch (sdkError: any) {
+    // SDK a échoué (probablement loadConfig en CageFS) — passer à la tentative 2
+    console.error('[assistant/llm] SDK failed:', sdkError?.message?.slice(0, 150) || sdkError);
   }
+
+  // --- Tentative 2: via fetch direct (contourne le SDK) ---
+  const config = readConfigDirect();
+  if (config) {
+    const directReply = await callLLMDirect(config, messages, maxTokens);
+    if (directReply) {
+      return directReply;
+    }
+  } else {
+    console.error('[assistant/llm] No config found via readFileSync either');
+  }
+
+  return null;
 }
 
 // === Message de fallback quand le LLM échoue ===

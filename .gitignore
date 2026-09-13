@@ -11,6 +11,7 @@
 .env.development
 .env.test
 .env.*.local
+.z-ai-config
 
 # === Build outputs (regénérables via `bun run build`) ===
 .next/

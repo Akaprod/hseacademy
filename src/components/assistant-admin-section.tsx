@@ -27,9 +27,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Sparkles, Save, Shield, Lock, Database, BookOpen, FileText, Globe,
-  Settings, Sliders, AlertTriangle, CheckCircle2, XCircle,
+  Settings, Sliders, AlertTriangle, CheckCircle2, XCircle, Bot, GraduationCap,
 } from 'lucide-react';
 import { LLMConfigTab } from '@/components/assistant-llm-config-tab';
+import { LaraConfigPanel } from '@/components/lara-config-panel';
+import { EduLaraPanel } from '@/components/edu-lara-panel';
 
 // ===== Types locaux =====
 interface AssistantConfig {
@@ -214,9 +216,9 @@ export function AssistantAdminSection() {
         </p>
       </div>
 
-      {/* === Tabs 6 espaces (5 existants + Configuration IA) === */}
+      {/* === Tabs 8 espaces (5 existants + Config IA + Lara + EDU LARA) === */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-2 md:grid-cols-6 gap-1 h-auto">
+        <TabsList className="grid grid-cols-2 md:grid-cols-8 gap-1 h-auto">
           <TabsTrigger value="config" className="flex items-center gap-1.5 text-xs md:text-sm">
             <Settings className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Configuration</span>
           </TabsTrigger>
@@ -234,6 +236,12 @@ export function AssistantAdminSection() {
           </TabsTrigger>
           <TabsTrigger value="llm" className="flex items-center gap-1.5 text-xs md:text-sm">
             <Sparkles className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Config IA</span>
+          </TabsTrigger>
+          <TabsTrigger value="lara" className="flex items-center gap-1.5 text-xs md:text-sm">
+            <Bot className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Lara</span>
+          </TabsTrigger>
+          <TabsTrigger value="edu-lara" className="flex items-center gap-1.5 text-xs md:text-sm">
+            <GraduationCap className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Lara EDU</span>
           </TabsTrigger>
         </TabsList>
 
@@ -677,6 +685,16 @@ export function AssistantAdminSection() {
         {/* === Espace 6 — Configuration IA (Multi-LLM) === */}
         <TabsContent value="llm">
           <LLMConfigTab />
+        </TabsContent>
+
+        {/* === Espace 7 — Configuration Lara (quotas + limites) === */}
+        <TabsContent value="lara">
+          <LaraConfigPanel />
+        </TabsContent>
+
+        {/* === Espace 8 — Lara EDU (5 couches comportementales + system layers) === */}
+        <TabsContent value="edu-lara">
+          <EduLaraPanel />
         </TabsContent>
       </Tabs>
 

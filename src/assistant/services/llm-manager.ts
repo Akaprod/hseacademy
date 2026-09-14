@@ -23,6 +23,7 @@
 import { db } from '@/lib/db';
 import { getProviderAdapter } from '../providers/registry';
 import { zaiAdapter, readZaiConfigFile } from '../providers/zai';
+import { openrouterAdapter, OPENROUTER_PRIMARY_MODEL, OPENROUTER_FALLBACK_MODEL } from '../providers/openrouter';
 import type { LLMMessage } from './llm';
 import type { LLMCallResult, LLMCallStatus } from '../providers/types';
 
@@ -261,6 +262,81 @@ async function tryZaiLegacy(messages: LLMMessage[], maxTokens: number): Promise<
 }
 
 // ============================================================================
+// OpenRouter fallback — via OPENROUTER_API_KEY env var
+// ============================================================================
+// Flow à 2 étapes (règle "1 SEULE TENTATIVE INTELLIGENTE" par modèle) :
+//
+//   ÉTAPE 1 : Gemini 2.5 Flash-Lite (modèle PRIMAIRE — payant, exception autorisée)
+//             1 SEULE tentative. Si succès → retour content.
+//             Si échec (429, 500, timeout, etc.) → passe à l'étape 2.
+//
+//   ÉTAPE 2 : nvidia/nemotron-3-super-120b-a12b:free (FALLBACK GRATUIT)
+//             1 SEULE tentative. Si succès → retour content.
+//             Si échec → retour null (le manager continuera vers legacy .z-ai-config).
+//
+// PAS de retry, PAS de boucle, PAS de rotation entre les deux modèles.
+// Au maximum 2 appels OpenRouter par requête utilisateur.
+//
+// SAFETY : la whitelist stricte dans openrouter.ts garantit qu'AUCUN autre
+// modèle (payant ou gratuit) ne peut être utilisé via cette adapter.
+// ============================================================================
+async function tryOpenRouterFromEnv(messages: LLMMessage[], maxTokens: number): Promise<string | null> {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey || apiKey.trim().length < 10) {
+    console.log('[llm-manager] OPENROUTER_API_KEY not set or empty — skipping OpenRouter fallback');
+    return null;
+  }
+
+  // ========================================================================
+  // ÉTAPE 1 — Gemini 2.5 Flash-Lite (PRIMAIRE, 1 seule tentative)
+  // ========================================================================
+  console.log(`[llm-manager] Trying OpenRouter PRIMARY model: ${OPENROUTER_PRIMARY_MODEL}`);
+  const primaryResult = await openrouterAdapter.call({
+    baseUrl: 'https://openrouter.ai/api/v1',
+    apiKey,
+    model: OPENROUTER_PRIMARY_MODEL,
+    messages,
+    maxTokens,
+    timeoutMs: 30000, // Gemini est rapide (~1s), 30s est large
+  });
+
+  if (primaryResult.status === 'success' && primaryResult.content) {
+    console.log(`[llm-manager] OpenRouter PRIMARY succeeded (${primaryResult.latencyMs}ms) — model: ${OPENROUTER_PRIMARY_MODEL}`);
+    return primaryResult.content;
+  }
+
+  // Si Gemini a échoué sur model_not_whitelisted ou auth_error → ne pas essayer le fallback
+  // (le fallback Nemotron aurait les mêmes problèmes de clé/whitelist)
+  if (primaryResult.errorCode === 'model_not_whitelisted' || primaryResult.status === 'auth_error') {
+    console.warn(`[llm-manager] OpenRouter PRIMARY critical failure: ${primaryResult.status} (${primaryResult.errorCode}) — skipping fallback (same key/whitelist would fail)`);
+    return null;
+  }
+
+  console.warn(`[llm-manager] OpenRouter PRIMARY failed: ${primaryResult.status} (${primaryResult.httpStatus || 'n/a'}) ${primaryResult.errorCode || ''} — falling back to FREE model`);
+
+  // ========================================================================
+  // ÉTAPE 2 — nvidia/nemotron-3-super-120b-a12b:free (FALLBACK, 1 seule tentative)
+  // ========================================================================
+  console.log(`[llm-manager] Trying OpenRouter FALLBACK model: ${OPENROUTER_FALLBACK_MODEL}`);
+  const fallbackResult = await openrouterAdapter.call({
+    baseUrl: 'https://openrouter.ai/api/v1',
+    apiKey,
+    model: OPENROUTER_FALLBACK_MODEL,
+    messages,
+    maxTokens,
+    timeoutMs: 60000, // Nemotron free peut être lent (reasoning model)
+  });
+
+  if (fallbackResult.status === 'success' && fallbackResult.content) {
+    console.log(`[llm-manager] OpenRouter FALLBACK succeeded (${fallbackResult.latencyMs}ms) — model: ${OPENROUTER_FALLBACK_MODEL}`);
+    return fallbackResult.content;
+  }
+
+  console.warn(`[llm-manager] OpenRouter FALLBACK also failed: ${fallbackResult.status} (${fallbackResult.httpStatus || 'n/a'}) ${fallbackResult.errorCode || ''} — NO more OpenRouter models to try`);
+  return null;
+}
+
+// ============================================================================
 // PUBLIC ENTRY POINT — signature preserved from old callLLM
 // ============================================================================
 export async function callLLMViaManager(
@@ -276,7 +352,7 @@ export async function callLLMViaManager(
   // 1. Try each active provider in DB order (priority asc)
   const providers = await getActiveProviders();
   if (providers.length === 0) {
-    console.log('[llm-manager] No active providers in DB — falling back to legacy Z.ai path');
+    console.log('[llm-manager] No active providers in DB — trying OpenRouter fallback (Gemini primary, Nemotron free fallback)');
   } else {
     console.log(`[llm-manager] Trying ${providers.length} provider(s): ${providers.map(p => p.code).join(', ')}`);
     for (const provider of providers) {
@@ -289,9 +365,17 @@ export async function callLLMViaManager(
         console.warn(`[llm-manager] Provider ${provider.code} exhausted, trying next`);
       }
     }
-    console.warn('[llm-manager] All DB providers exhausted — falling back to legacy Z.ai path');
+    console.warn('[llm-manager] All DB providers exhausted — trying OpenRouter fallback (Gemini primary, Nemotron free fallback)');
   }
 
-  // 2. Legacy fallback: Z.ai via .z-ai-config file (preserve existing behavior)
+  // 2. OpenRouter fallback — env-based (Gemini primary + Nemotron free fallback, no DB row required)
+  // Tries OpenRouter using OPENROUTER_API_KEY env var. Tries Gemini first, then Nemotron free.
+  // The whitelist in openrouter.ts ensures NO other model can be used.
+  const openrouterContent = await tryOpenRouterFromEnv(messages, maxTokens);
+  if (openrouterContent) {
+    return openrouterContent;
+  }
+
+  // 3. Legacy fallback: Z.ai via .z-ai-config file (preserve existing behavior)
   return await tryZaiLegacy(messages, maxTokens);
 }

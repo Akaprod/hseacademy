@@ -18,6 +18,16 @@ export interface AssistantConfigData {
   welcomeMessage: string;
   language: 'fr' | 'en' | 'ar';
   availabilityMode: 'always' | 'business_hours' | 'manual';
+  // Lara Config — Limites de réponse + rate limiting
+  responseMode: 'simple' | 'normal' | 'detailed';
+  simpleMaxWords: number;
+  normalMaxWords: number;
+  detailedMaxWords: number;
+  maxUserMessageLength: number;
+  visitorMessageLimit: number;
+  userMessageLimit: number;
+  adminMessageLimit: number; // 0 = unlimited
+  messageLimitPeriodHours: number;
   updatedAt?: string;
   updatedBy?: string | null;
 }

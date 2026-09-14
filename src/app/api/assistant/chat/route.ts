@@ -29,6 +29,8 @@ import { checkRateLimit, getClientIP } from '@/assistant/server/rate-limit';
 import { getOrCreateConversation, appendMessage, getRecentMessages } from '@/assistant/services/memory';
 import { getRelevantSources, serializeSourcesForPrompt } from '@/assistant/services/knowledge';
 import { callLLM, LLM_FALLBACK_REPLY, type LLMMessage } from '@/assistant/services/llm';
+import { getOrCreateVisitorId, checkQuota, incrementQuota, getQuotaExceededMessage } from '@/assistant/services/quota';
+import { processProspectTransmit } from '@/assistant/services/prospect';
 import { randomBytes } from 'node:crypto';
 import type { ChatRequest, ChatResponse } from '@/assistant/types';
 
@@ -68,35 +70,52 @@ export async function POST(req: NextRequest) {
 
   const userAuth = await getOptionalUser();
 
+  // [0.5] Load config EARLY — needed for message length validation + response limits
+  let config;
+  try {
+    config = await getConfig();
+  } catch {
+    return NextResponse.json({
+      mode: 'commercial' as const,
+      reply: "L'Assistant IA est actuellement indisponible. Veuillez réessayer plus tard ou nous contacter via le formulaire de contact.",
+      refused: false,
+      requestId: randomBytes(8).toString('hex'),
+    } satisfies ChatResponse);
+  }
+
   try {
     const body = (await req.json()) as ChatRequest;
     const { message } = body;
 
-    // [1] Validation
+    // [1] Validation — use configurable max length
     if (!message || typeof message !== 'string' || message.trim().length === 0) {
       return NextResponse.json({ error: 'Message vide' }, { status: 400 });
     }
-    if (message.length > 5000) {
-      return NextResponse.json({ error: 'Message trop long (max 5000 caractères)' }, { status: 400 });
+    const maxLen = config.maxUserMessageLength || 5000;
+    if (message.length > maxLen) {
+      return NextResponse.json({ error: `Message trop long (max ${maxLen} caractères)` }, { status: 400 });
+    }
+
+    // [1.5] QUOTA CHECK — server-side, NO LLM call if quota exceeded
+    const visitorId = userAuth ? undefined : await getOrCreateVisitorId();
+    const userAuthForQuota = userAuth ? { id: userAuth.id, role: userAuth.role } : null;
+    const quotaResult = await checkQuota(config, userAuthForQuota, visitorId);
+
+    if (!quotaResult.allowed) {
+      // Quota exceeded — return server-controlled message (NO LLM call)
+      const quotaMessage = getQuotaExceededMessage(quotaResult.userType, quotaResult.remaining);
+      return NextResponse.json({
+        mode: 'commercial' as const,
+        reply: quotaMessage,
+        refused: false,
+        requestId: randomBytes(8).toString('hex'),
+      } satisfies ChatResponse);
     }
 
     // [2] Prompt injection detection
     const injectionCheck = detectPromptInjection(message);
     if (injectionCheck.suspicious && injectionCheck.reason?.includes('limite')) {
       return NextResponse.json({ error: injectionCheck.reason }, { status: 400 });
-    }
-
-    // [3] Config (graceful degradation si table DB inexistante)
-    let config;
-    try {
-      config = await getConfig();
-    } catch {
-      return NextResponse.json({
-        mode: 'commercial' as const,
-        reply: "L'Assistant IA est actuellement indisponible. Veuillez réessayer plus tard ou nous contacter via le formulaire de contact.",
-        refused: false,
-        requestId: randomBytes(8).toString('hex'),
-      } satisfies ChatResponse);
     }
 
     if (!config.enabled) {
@@ -163,6 +182,12 @@ export async function POST(req: NextRequest) {
       behavior,
       userContext: serializedContext,
       knowledgeSources: serializedSources || undefined,
+      responseConfig: {
+        mode: config.responseMode,
+        maxWords: config.responseMode === 'simple' ? config.simpleMaxWords
+          : config.responseMode === 'detailed' ? config.detailedMaxWords
+          : config.normalMaxWords,
+      },
     });
 
     // [11] READ-ONLY enforcement
@@ -197,17 +222,35 @@ export async function POST(req: NextRequest) {
     }
 
     // [14] Appel au LLM (z-ai-web-dev-sdk)
-    const llmReply = await callLLM(systemPrompt, llmMessages);
+    // [14] Appel au LLM — maxTokens calculé depuis responseMode configurable
+    const maxWords = config.responseMode === 'simple' ? config.simpleMaxWords
+      : config.responseMode === 'detailed' ? config.detailedMaxWords
+      : config.normalMaxWords;
+    // Approximation: 1 mot ≈ 1.3 tokens + marge 30% pour éviter phrase cassée
+    const maxTokens = Math.ceil(maxWords * 1.3 * 1.3);
+    const llmReply = await callLLM(systemPrompt, llmMessages, maxTokens);
 
-    // [15] Persister les messages (mémoire)
+    // [15] Persister les messages (mémoire) + increment quota
     await appendMessage(conversationId, { role: 'user', content: message, mode: resolvedMode });
+    // Increment visitor/user quota (admin = no increment, handled in incrementQuota)
+    await incrementQuota(config, userAuthForQuota, visitorId).catch(() => {});
 
     if (llmReply) {
-      // Succès — persister la réponse de l'assistant
-      await appendMessage(conversationId, { role: 'assistant', content: llmReply, mode: resolvedMode });
+      // [15.5] PROSPECT TRANSMISSION — détecter et traiter le marqueur [PROSPECT_TRANSMIT]
+      // Le LLM peut inclure un bloc structuré pour demander la création d'un ContactMessage.
+      // Le serveur valide strictement, crée le ContactMessage si tout est valide,
+      // puis supprime le marqueur de la réponse avant de la retourner à l'utilisateur.
+      const prospectResult = await processProspectTransmit(llmReply, [
+        ...history.map(m => ({ role: m.role, content: m.content })),
+        { role: 'user', content: message },
+      ]);
+      const finalReply = prospectResult.cleanedReply;
+
+      // Persister la réponse NETTOYÉE (sans marqueur interne) dans la mémoire
+      await appendMessage(conversationId, { role: 'assistant', content: finalReply, mode: resolvedMode });
       return NextResponse.json({
         mode: resolvedMode,
-        reply: llmReply,
+        reply: finalReply,
         refused: false,
         conversationId: conversationId ?? undefined,
         requestId: randomBytes(8).toString('hex'),

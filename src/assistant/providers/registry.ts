@@ -13,10 +13,12 @@
 import type { LLMProviderAdapter } from './types';
 import { groqAdapter } from './groq';
 import { zaiAdapter } from './zai';
+import { openrouterAdapter } from './openrouter';
 
 const REGISTRY: Record<string, LLMProviderAdapter> = {
   groq: groqAdapter,
   zai: zaiAdapter,
+  openrouter: openrouterAdapter,
   // Future providers — uncomment when implemented:
   // openai: openaiAdapter,
   // anthropic: anthropicAdapter,

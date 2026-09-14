@@ -5,6 +5,11 @@
 import type { AssistantMode, AssistantBehaviorData } from '../types';
 import { SYSTEM_SAFETY_RULES } from '../instructions/system-safety';
 import { INSTITUTIONAL_CONTEXT } from '../instructions/institutional-context';
+import { EDU_LARA_01 } from '../instructions/edu-lara-01';
+import { EDU_LARA_02 } from '../instructions/edu-lara-02';
+import { EDU_LARA_03 } from '../instructions/edu-lara-03';
+import { EDU_LARA_04 } from '../instructions/edu-lara-04';
+import { EDU_LARA_05 } from '../instructions/edu-lara-05';
 
 // --- Résolution sécurisée du mode (jamais trust le client) ---
 export function resolveMode(
@@ -48,6 +53,10 @@ export function buildSystemPrompt(params: {
   behavior?: AssistantBehaviorData | null;
   userContext?: string;
   knowledgeSources?: string;
+  responseConfig?: {
+    mode: string;
+    maxWords: number;
+  };
 }): string {
   const sections: string[] = [
     // [1] SYSTEM SAFETY — TOUJOURS EN PREMIER, IMMUABLE
@@ -59,12 +68,45 @@ export function buildSystemPrompt(params: {
     // [3] GENERAL
     params.generalInstructions,
     '', '---', '',
+    // [3.5] EDU LARA N°01 — Comportement conversationnel (couche additive)
+    EDU_LARA_01,
+    '', '---', '',
+    // [3.6] EDU LARA N°02 — Qualification + orientation commerciale (couche additive)
+    EDU_LARA_02,
+    '', '---', '',
+    // [3.7] EDU LARA N°03 — Inscription et accompagnement du prospect (couche additive)
+    EDU_LARA_03,
+    '', '---', '',
+    // [3.8] EDU LARA N°04 — Mémoire prospect + collecte + transmission (couche additive)
+    EDU_LARA_04,
+    '', '---', '',
+    // [3.9] EDU LARA N°05 — Transmission réelle des prospects (couche additive)
+    EDU_LARA_05,
+    '', '---', '',
     // [4] MODE
     params.modeInstructions,
   ];
 
   if (params.limitsInstructions && params.limitsInstructions.trim().length > 0) {
     sections.push('', '---', '', params.limitsInstructions);
+  }
+
+  // [4.5] RESPONSE LIMITS — configurable word limit + conciseness + language
+  if (params.responseConfig) {
+    const modeLabel = params.responseConfig.mode === 'simple' ? 'Simple'
+      : params.responseConfig.mode === 'detailed' ? 'Détaillée'
+      : 'Normale';
+    sections.push('', '---', '',
+      `# LIMITES DE RÉPONSE (mode ${modeLabel})`,
+      '',
+      `Tes réponses doivent faire AU MAXIMUM ${params.responseConfig.maxWords} mots.`,
+      'RÈGLES DE CONCISION :',
+      '- Sois DIRECT. Pas d\'introduction longue. Pas de formules de politesse excessives.',
+      '- Une question simple = une réponse simple (1-2 phrases).',
+      '- Ne répète pas la question dans ta réponse.',
+      '- Réponds dans la langue utilisée par l\'utilisateur (français, arabe, darija, anglais, etc.).',
+      '- Si l\'utilisateur écrit en arabe, réponds en arabe. Si en français, en français. Etc.',
+    );
   }
 
   if (params.behavior) {
@@ -153,8 +195,9 @@ export function detectPromptInjection(message: string): { suspicious: boolean; r
       return { suspicious: true, reason: 'Tentative manifeste de contournement des règles de sécurité' };
     }
   }
-  if (message.length > 5000) {
-    return { suspicious: true, reason: 'Message trop long (limite 5000 caractères)' };
-  }
+  // NOTE: la limite de longueur du message est enforceée côté chat/route.ts
+  // via `config.maxUserMessageLength` (vérification serveur BEFORE detectPromptInjection).
+  // Ne pas dupliquer cette vérification ici avec une valeur hardcodée —
+  // cela rendrait maxUserMessageLength inopérant au-dessus de 5000.
   return { suspicious: false };
 }

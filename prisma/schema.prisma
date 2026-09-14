@@ -785,6 +785,20 @@ model AssistantConfig {
   language          String   @default("fr") // fr | en | ar
   availabilityMode  String   @default("always") // always | business_hours | manual
 
+  // === [Lara Config] Limites de réponse + rate limiting configurable ===
+  // Response modes: simple (50 mots), normal (150 mots), detailed (200 mots)
+  responseMode              String  @default("normal") // simple | normal | detailed
+  simpleMaxWords            Int     @default(50)
+  normalMaxWords           Int     @default(150)
+  detailedMaxWords          Int     @default(200)
+  // User message length limit (chars)
+  maxUserMessageLength      Int     @default(5000)
+  // Per-user message limits (rolling 24h period)
+  visitorMessageLimit       Int     @default(20)
+  userMessageLimit          Int     @default(60)
+  adminMessageLimit          Int     @default(0) // 0 = unlimited
+  messageLimitPeriodHours   Int     @default(24)
+
   updatedAt         DateTime @updatedAt
   updatedBy         String?
 
@@ -938,4 +952,23 @@ model AssistantLlmApiKey {
   @@index([providerId, priority])
   @@index([status])
   @@map("assistant_llm_api_key")
+}
+
+// ============================================================================
+// VISITOR QUOTA — Comptage des messages par visiteur anonyme
+// ============================================================================
+// Chaque visiteur reçoit un cookie HttpOnly 'lara_visitor_id' (UUID aléatoire).
+// Cette table stocke le compteur de messages + la fenêtre de comptage.
+// Quand la fenêtre expire (windowStart + messageLimitPeriodHours), le compteur reset.
+// ============================================================================
+model AssistantVisitorQuota {
+  id            String   @id @default(cuid())
+  visitorId     String   @unique // cookie value (UUID)
+  messageCount  Int      @default(0)
+  windowStart   DateTime @default(now())
+  lastMessageAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("assistant_visitor_quota")
 }

@@ -17,6 +17,15 @@ const DEFAULT_CONFIG: AssistantConfigData = {
   welcomeMessage: "Bonjour, je suis l'Assistant IA de HSE Academy. Comment puis-je vous aider ?",
   language: 'fr',
   availabilityMode: 'always',
+  responseMode: 'normal',
+  simpleMaxWords: 50,
+  normalMaxWords: 150,
+  detailedMaxWords: 200,
+  maxUserMessageLength: 5000,
+  visitorMessageLimit: 20,
+  userMessageLimit: 60,
+  adminMessageLimit: 0,
+  messageLimitPeriodHours: 24,
   updatedAt: new Date().toISOString(),
   updatedBy: null,
 };
@@ -34,6 +43,9 @@ export async function updateConfig(
   updates: Partial<Pick<AssistantConfigData,
     'enabled' | 'commercialEnabled' | 'userEnabled' | 'adminEnabled'
     | 'name' | 'welcomeMessage' | 'language' | 'availabilityMode'
+    | 'responseMode' | 'simpleMaxWords' | 'normalMaxWords' | 'detailedMaxWords'
+    | 'maxUserMessageLength'
+    | 'visitorMessageLimit' | 'userMessageLimit' | 'adminMessageLimit' | 'messageLimitPeriodHours'
   >>,
   updatedByUserId: string
 ): Promise<AssistantConfigData> {
@@ -111,6 +123,15 @@ function rowToConfig(row: any): AssistantConfigData {
     welcomeMessage: row.welcomeMessage,
     language: row.language,
     availabilityMode: row.availabilityMode,
+    responseMode: row.responseMode ?? 'normal',
+    simpleMaxWords: row.simpleMaxWords ?? 50,
+    normalMaxWords: row.normalMaxWords ?? 150,
+    detailedMaxWords: row.detailedMaxWords ?? 200,
+    maxUserMessageLength: row.maxUserMessageLength ?? 5000,
+    visitorMessageLimit: row.visitorMessageLimit ?? 20,
+    userMessageLimit: row.userMessageLimit ?? 60,
+    adminMessageLimit: row.adminMessageLimit ?? 0,
+    messageLimitPeriodHours: row.messageLimitPeriodHours ?? 24,
     updatedAt: row.updatedAt?.toISOString?.() ?? row.updatedAt,
     updatedBy: row.updatedBy,
   };

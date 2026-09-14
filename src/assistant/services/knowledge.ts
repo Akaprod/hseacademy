@@ -39,19 +39,60 @@ export async function getRelevantSources(
 
     const enabledCategories = sourceConfigs.map(s => s.category as KnowledgeSourceCategory);
 
+    // Détection des requêtes "catalogue" génériques — quand l'utilisateur demande
+    // à voir TOUTES les formations/cours, on retourne tout sans filtrage par pertinence
+    // (sinon l'heuristique isRelevant() filtre la plupart des résultats)
+    const isCatalogQuery = isCatalogRequest(query);
+
     // Pour chaque catégorie activée, lire les données publiques
     for (const category of enabledCategories) {
-      const items = await readSourceData(category, query);
+      const items = await readSourceData(category, query, isCatalogQuery);
       sources.push(...items);
     }
 
     // Trier par pertinence décroissante puis limiter
+    // Si c'est une requête catalogue, on trie par ordre alphabétique pour avoir une liste stable
+    if (isCatalogQuery) {
+      return sources.sort((a, b) => a.title.localeCompare(b.title)).slice(0, 20);
+    }
     const sorted = sortByRelevance(sources, query);
     return sorted.slice(0, 10);
   } catch (error) {
     console.error('[assistant/knowledge] getRelevantSources error:', error);
     return []; // graceful degradation
   }
+}
+
+// === Détecte si la question demande explicitement la liste/catalogue complet ===
+// Ces patterns déclenchent le mode "catalogue" qui retourne toutes les formations
+// sans filtrage par pertinence (sinon l'heuristique enlève la plupart des résultats)
+function isCatalogRequest(query: string): boolean {
+  const q = query.toLowerCase().trim();
+  const catalogPatterns = [
+    // "liste-moi/montre-moi/affiche toutes les/vos formations/cours"
+    /list[eè]?[- ]?(moi|nous)?\s+(toutes?\s+)?(les|vos|des|mes)?\s*(formations?|cours|dipl[ôo]mantes?|certifiantes?)/,
+    /montrez?[- ]?(moi|nous)?\s+(tout(?:es?|s)\s+)?(les|vos|des|mes)?\s*(formations?|cours)/,
+    /affichez?\s+(toutes?\s+)?(les|vos|des|mes)?\s*(formations?|cours)/,
+    // "quelles sont toutes les formations" / "quelles formations proposez-vous"
+    /(quelles?|quels?)\s+((sont\s+)?(les|vos)\s+)?(toutes?\s+)?(formations?|cours|dipl[ôo]mantes?|certifiantes?)/,
+    // "toutes les/vos formations disponibles/proposées"
+    /(toutes?\s+)?(les|vos)\s+(formations?|cours)\s+(disponibles?|propose[ée]s?|existants?|en\s+ligne)/,
+    // "catalogue des formations"
+    /catalogue\s+(de\s+|des\s+)?(formations?|cours)/,
+    // "que proposez-vous" / "qu'est-ce que vous proposez"
+    /qu['e ]est[- ]?ce\s+(que\s+)?vous\s+propos(ez|er)/,
+    /que\s+propos(ez|er)[- ]?vous/,
+    /vous\s+propos(ez|er)\s+(des?|des?\s+formations?|des?\s+cours)/,
+    // "formations QHSE" / "cours QHSE" — mentionne les formations/cours avec le domaine
+    /(formations?|cours)\s+(q?hse|propos|disponibles?|existants?)/,
+    // "liste complète"
+    /liste\s+compl[èe]te/,
+    // "voir les formations" / "voir tous les cours"
+    /voir\s+(toutes?\s+)?(les|vos)\s+(formations?|cours)/,
+    // "parler de vos formations" / "parler des formations"
+    /parler\s+(de\s+)?(vos|les|des)\s+(formations?|cours)/,
+  ];
+  return catalogPatterns.some(p => p.test(q));
 }
 
 // === Initialise les configs de source si la table est vide ===
@@ -75,7 +116,8 @@ async function ensureSourceConfigsExist(): Promise<void> {
 // === Lire les données publiques depuis la DB pour une catégorie ===
 async function readSourceData(
   category: KnowledgeSourceCategory,
-  query: string
+  query: string,
+  isCatalogQuery: boolean = false
 ): Promise<KnowledgeSource[]> {
   const queryLower = query.toLowerCase();
   const now = new Date().toISOString();
@@ -99,12 +141,20 @@ async function readSourceData(
           // Inclure plus de texte pour le matching (title + shortDesc + fullDesc + objectives)
           const objectives = safeJsonParse(f.objectives, []);
           const text = `${f.title} ${f.shortDescription || ''} ${f.fullDescription || ''} ${objectives.join(' ')}`.toLowerCase();
-          if (isRelevant(text, queryLower)) {
+          // Si requête catalogue → inclure toutes les formations sans filtrage
+          // Sinon → filtrer par pertinence
+          if (isCatalogQuery || isRelevant(text, queryLower)) {
+            // Format lisible avec type en préfixe pour que le LLM distingue
+            // formations diplômantes (longues, hybride) vs certifiantes (courtes, présentiel)
+            const typeLabel = f.type === 'diplomante' ? 'DIPLÔMANTE' : 'CERTIFIANTE';
+            const levelLabel = f.level || 'N/A';
+            const priceInfo = f.priceIndividual ? ` | Prix: ${f.priceIndividual}` : '';
+            const objInfo = objectives.length > 0 ? ` | Objectifs: ${objectives.slice(0, 3).join(', ')}` : '';
             sources.push({
               category: 'formations',
               refId: f.slug || f.id,
-              title: f.title,
-              content: `${f.title} — ${f.shortDescription || ''}\nNiveau: ${f.level} | Type: ${f.type} | Durée: ${f.duration} | Mode: ${f.mode}\nTarifs: Individuel ${f.priceIndividual || 'N/A'} | Groupe ${f.priceGroup || 'N/A'} | Entreprise ${f.priceEnterprise || 'N/A'}${objectives.length > 0 ? '\nObjectifs: ' + objectives.join(', ') : ''}`,
+              title: `[${typeLabel}] ${f.title}`,
+              content: `${f.shortDescription || ''} | Niveau: ${levelLabel} | Durée: ${f.duration} | Mode: ${f.mode}${priceInfo}${objInfo}`,
               publicUrl: f.slug ? `/formations?f=${f.slug}` : undefined,
               contentHash: '',
               syncedAt: now,
@@ -125,7 +175,7 @@ async function readSourceData(
         });
         for (const c of courses) {
           const text = `${c.title} ${c.description || ''} ${c.shortDescription || ''}`.toLowerCase();
-          if (isRelevant(text, queryLower)) {
+          if (isCatalogQuery || isRelevant(text, queryLower)) {
             sources.push({
               category: 'courses',
               refId: c.slug || c.id,
@@ -150,7 +200,7 @@ async function readSourceData(
         });
         for (const p of pages) {
           const text = `${p.title} ${(p.content || '').substring(0, 200)}`.toLowerCase();
-          if (isRelevant(text, queryLower)) {
+          if (isCatalogQuery || isRelevant(text, queryLower)) {
             sources.push({
               category: 'public_pages',
               refId: p.slug || p.id,
@@ -266,16 +316,50 @@ function safeJsonParse(str: string | null, fallback: any): any {
 }
 
 // === Sérialiser les sources pour le prompt LLM ===
+// FORMAT OPTIMISÉ : regroupe les sources par catégorie avec un résumé structuré
+// en tête, pour que le LLM ait une vision claire du catalogue (diplômantes vs
+// certifiantes vs cours gratuits) au lieu d'une liste plate et technique.
 export function serializeSourcesForPrompt(sources: KnowledgeSource[]): string {
   if (sources.length === 0) return '';
-  const sections = sources.map(s => {
-    let line = `## ${s.title}`;
-    if (s.publicUrl) line += ` (URL: ${s.publicUrl})`;
-    line += `\n${s.content}`;
-    return line;
-  });
-  return sections.join('\n\n---\n\n');
+
+  // Grouper par catégorie
+  const byCategory: Record<string, KnowledgeSource[]> = {};
+  for (const s of sources) {
+    if (!byCategory[s.category]) byCategory[s.category] = [];
+    byCategory[s.category].push(s);
+  }
+
+  const sections: string[] = [];
+
+  // Pour chaque catégorie, ajouter un en-tête + les items
+  for (const cat of ALL_CATEGORIES) {
+    const items = byCategory[cat];
+    if (!items || items.length === 0) continue;
+
+    const catLabel = SOURCE_CATEGORY_LABELS[cat] || cat;
+    sections.push(`### ${catLabel} (${items.length} au total)`);
+
+    for (const s of items) {
+      let line = `- ${s.title}`;
+      if (s.publicUrl) line += ` (URL: ${s.publicUrl})`;
+      line += `\n  ${s.content.replace(/\n/g, '\n  ')}`;
+      sections.push(line);
+    }
+    sections.push(''); // ligne vide entre catégories
+  }
+
+  return sections.join('\n').trim();
 }
+
+// Labels lisibles pour chaque catégorie (utilisé dans la sérialisation)
+const SOURCE_CATEGORY_LABELS: Record<string, string> = {
+  formations: 'FORMATIONS DIPLÔMANTES ET CERTIFIANTES',
+  courses: 'COURS EN LIGNE GRATUITS',
+  promotions: 'PROMOTIONS',
+  faq: 'FAQ',
+  public_pages: 'PAGES PUBLIQUES',
+  institutional: 'INFORMATIONS INSTITUTIONNELLES',
+};
 
 // === Stub conservé pour compatibilité (syncAllSources) ===
 export async function syncAllSources(): Promise<{ total: number; updated: number; unchanged: number }> {

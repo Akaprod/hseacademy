@@ -43,7 +43,53 @@ export async function getAllSources(): Promise<AssistantSourceConfigData[]> {
     })));
     return getAllSources();
   }
-  return rows.map(rowToSource);
+
+  // === Compter les documents réels par catégorie et mettre à jour documentCount + lastSyncAt ===
+  // Ceci permet au dashboard d'afficher le vrai nombre de documents (Formations, Cours, Pages...)
+  // au lieu de toujours afficher "0 doc."
+  try {
+    const counts = await countDocumentsPerCategory();
+    const now = new Date();
+    await db.$transaction(
+      Object.entries(counts).map(([cat, count]) =>
+        db.assistantSourceConfig.update({
+          where: { category: cat },
+          data: { documentCount: count, lastSyncAt: now },
+        })
+      )
+    );
+    // Re-fetch after update to return fresh data
+    const freshRows = await db.assistantSourceConfig.findMany();
+    return freshRows.map(rowToSource);
+  } catch (error) {
+    console.error('[assistant/sources] Failed to update documentCount:', error);
+    // Graceful: return rows without update if counting fails
+    return rows.map(rowToSource);
+  }
+}
+
+// === Compter les documents réels par catégorie ===
+// Lecture seule des tables publiques pour donner un compte exact au dashboard
+async function countDocumentsPerCategory(): Promise<Record<string, number>> {
+  const counts: Record<string, number> = {};
+  try {
+    counts.formations = await db.formation.count({ where: { archived: false } });
+  } catch { counts.formations = 0; }
+  try {
+    counts.courses = await db.onlineCourse.count({ where: { published: true } });
+  } catch { counts.courses = 0; }
+  try {
+    counts.public_pages = await db.page.count({ where: { published: true } });
+  } catch { counts.public_pages = 0; }
+  try {
+    // Institutional = 1 si LegalSettings existe, 0 sinon
+    const legal = await db.legalSettings.findUnique({ where: { id: 'default' } });
+    counts.institutional = legal ? 1 : 0;
+  } catch { counts.institutional = 0; }
+  // promotions et faq = pas encore implémentés (Phase 3 future)
+  counts.promotions = 0;
+  counts.faq = 0;
+  return counts;
 }
 
 export async function updateSource(

@@ -26,7 +26,8 @@ export type LLMCallStatus =
   | 'quota_exhausted'      // HTTP 402 ou code erreur provider spécifique (1113 Z.ai)
   | 'network_error'        // timeout, ECONNRESET, fetch throws
   | 'server_error'         // HTTP 5xx
-  | 'client_error'         // HTTP 4xx autre que 401/403/429
+  | 'model_not_found'      // HTTP 404 ou errorCode 'model_not_found' — le modèle n'existe pas
+  | 'client_error'         // HTTP 4xx autre que 401/403/429/404
   | 'empty_content'        // 200 mais content vide (modèle "thinking" mal configuré)
   | 'unknown_error';       // autre
 

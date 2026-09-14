@@ -25,14 +25,14 @@ export const PROVIDER_PRESETS = [
     displayName: 'Groq',
     adapter: 'openai_compatible',
     baseUrl: 'https://api.groq.com/openai/v1',
-    defaultModel: 'llama-3.3-70b-versatile',
+    defaultModel: 'openai/gpt-oss-120b',
     availableModels: JSON.stringify([
-      'llama-3.3-70b-versatile',
-      'llama-3.1-8b-instant',
-      'llama-3.2-1b-preview',
-      'llama-3.2-3b-preview',
-      'mixtral-8x7b-32768',
-      'gemma2-9b-it',
+      'openai/gpt-oss-120b',
+      'qwen/qwen3.8-27b',
+      'openai/gpt-oss-20b',
+      'qwen/qwen3.6-27b',
+      'groq/compound',
+      'groq/compound-mini',
     ]),
   },
   {
@@ -150,7 +150,7 @@ export async function GET() {
         health: computeProviderHealth(stats),
       };
     }));
-    return NextResponse.json({ providers: enriched, presets: PROVIDER_PRESETS, registeredAdapters: Object.keys(getProviderAdapterRegistry()) });
+    return NextResponse.json({ providers: enriched, presets: PROVIDER_PRESETS, registeredAdapters: getProviderAdapterRegistry() });
   } catch (error: any) {
     console.error('GET /api/assistant/llm/providers error:', error);
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });

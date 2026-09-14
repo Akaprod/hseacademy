@@ -32,6 +32,10 @@ function classifyError(httpStatus: number, body: string): { status: LLMCallStatu
   if (httpStatus === 401 || httpStatus === 403) return { status: 'auth_error', errorCode, errorMessage };
   if (httpStatus === 402) return { status: 'quota_exhausted', errorCode, errorMessage };
   if (httpStatus >= 500) return { status: 'server_error', errorCode, errorMessage };
+  // model_not_found must be detected BEFORE the generic client_error —
+  // Groq returns HTTP 404 with errorCode 'model_not_found' when the model doesn't exist.
+  // This lets the manager try the next model instead of penalizing the API key.
+  if (errorCode === 'model_not_found' || httpStatus === 404) return { status: 'model_not_found', errorCode, errorMessage };
   if (httpStatus >= 400) return { status: 'client_error', errorCode, errorMessage };
   return { status: 'unknown_error', errorCode, errorMessage };
 }

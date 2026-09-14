@@ -49,6 +49,8 @@ function classifyZaiError(httpStatus: number, body: string): { status: LLMCallSt
   if (httpStatus === 401 || httpStatus === 403) return { status: 'auth_error', errorCode, errorMessage };
   if (httpStatus === 402) return { status: 'quota_exhausted', errorCode, errorMessage };
   if (httpStatus >= 500) return { status: 'server_error', errorCode, errorMessage };
+  // model_not_found detection (same pattern as groq.ts for consistency)
+  if (errorCode === 'model_not_found' || httpStatus === 404) return { status: 'model_not_found', errorCode, errorMessage };
   if (httpStatus >= 400) return { status: 'client_error', errorCode, errorMessage };
   return { status: 'unknown_error', errorCode, errorMessage };
 }

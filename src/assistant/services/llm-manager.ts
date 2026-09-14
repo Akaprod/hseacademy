@@ -36,6 +36,7 @@ interface ProviderRow {
   adapter: string;
   baseUrl: string;
   defaultModel: string;
+  availableModels: string;
   priority: number;
 }
 
@@ -57,7 +58,7 @@ async function getActiveProviders(): Promise<ProviderRow[]> {
       orderBy: [{ priority: 'asc' }, { createdAt: 'asc' }],
       select: {
         id: true, code: true, displayName: true, adapter: true,
-        baseUrl: true, defaultModel: true, priority: true,
+        baseUrl: true, defaultModel: true, availableModels: true, priority: true,
       },
     });
     return rows.map(r => ({ ...r }));
@@ -137,6 +138,7 @@ function mapCallStatusToKeyStatus(callStatus: LLMCallStatus): string {
     case 'auth_error': return 'auth_error';
     case 'quota_exhausted': return 'quota_exhausted';
     case 'network_error': return 'network_error';
+    case 'model_not_found': return 'active'; // model issue, NOT key issue — don't penalize the key
     case 'empty_content': return 'active'; // model config issue, not key issue
     case 'server_error':
     case 'client_error':
@@ -149,6 +151,22 @@ function mapCallStatusToKeyStatus(callStatus: LLMCallStatus): string {
 // ============================================================================
 // Tentative d'appel à un provider avec rotation des clés
 // ============================================================================
+function buildModelList(provider: ProviderRow): string[] {
+  const models: string[] = [];
+  if (provider.defaultModel) models.push(provider.defaultModel);
+  try {
+    const available = JSON.parse(provider.availableModels || '[]');
+    if (Array.isArray(available)) {
+      for (const m of available) {
+        if (typeof m === 'string' && m && !models.includes(m)) {
+          models.push(m);
+        }
+      }
+    }
+  } catch { /* invalid JSON */ }
+  return models.length > 0 ? models : [provider.defaultModel];
+}
+
 async function tryProvider(
   provider: ProviderRow,
   messages: LLMMessage[],
@@ -166,34 +184,48 @@ async function tryProvider(
     return { content: null, lastResult: null };
   }
 
+  const models = buildModelList(provider);
+  console.log(`[llm-manager] Provider ${provider.code}: ${keys.length} key(s), ${models.length} model(s) [${models.join(', ')}]`);
+
   let lastResult: LLMCallResult | null = null;
 
   for (const key of keys) {
-    const result = await adapter.call({
-      baseUrl: provider.baseUrl,
-      apiKey: key.apiKey,
-      model: provider.defaultModel,
-      messages,
-      maxTokens,
-    });
-    lastResult = result;
+    const failedModels = new Set<string>();
+    let keySucceeded = false;
 
-    // Update key status in DB (async, don't block)
-    await updateKeyStatus(key.id, result).catch(() => {});
+    for (const model of models) {
+      if (failedModels.has(model)) continue;
 
-    if (result.status === 'success' && result.content) {
-      console.log(`[llm-manager] Provider ${provider.code} key "${key.label}" succeeded (${result.latencyMs}ms)`);
-      return { content: result.content, lastResult: result };
+      const result = await adapter.call({
+        baseUrl: provider.baseUrl,
+        apiKey: key.apiKey,
+        model,
+        messages,
+        maxTokens,
+      });
+      lastResult = result;
+
+      if (result.status === 'success' && result.content) {
+        console.log(`[llm-manager] Provider ${provider.code} key "${key.label}" model "${model}" succeeded (${result.latencyMs}ms)`);
+        await updateKeyStatus(key.id, result).catch(() => {});
+        keySucceeded = true;
+        return { content: result.content, lastResult: result };
+      }
+
+      if (result.status === 'model_not_found') {
+        console.warn(`[llm-manager] Provider ${provider.code} model "${model}" not found — skipping to next model`);
+        failedModels.add(model);
+        continue;
+      }
+
+      console.warn(`[llm-manager] Provider ${provider.code} key "${key.label}" model "${model}" failed: ${result.status} (${result.httpStatus || 'n/a'}) ${result.errorCode || ''}`);
+      await updateKeyStatus(key.id, result).catch(() => {});
+      break;
     }
 
-    console.warn(`[llm-manager] Provider ${provider.code} key "${key.label}" failed: ${result.status} (${result.httpStatus || 'n/a'}) ${result.errorCode || ''}`);
-
-    // If auth_error, key is likely invalid — don't retry same key, but continue to next
-    // If rate_limited, try next key (quota may be per-key)
-    // If network_error, try next key (maybe transient)
-    // If server_error, try next key (maybe transient)
-    // If quota_exhausted, try next key (account-level, but other key may be different account)
-    // If empty_content, try next key (different key may have different model access)
+    if (!keySucceeded && failedModels.size > 0 && failedModels.size === models.length) {
+      console.error(`[llm-manager] Provider ${provider.code}: ALL models returned model_not_found`);
+    }
   }
 
   return { content: null, lastResult };

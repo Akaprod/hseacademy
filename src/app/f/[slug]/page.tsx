@@ -19,6 +19,7 @@ import {
   CheckCircle2, ChevronRight, Briefcase, ShieldCheck, Building2, Users,
   CalendarDays, FileCheck, Star,
 } from 'lucide-react';
+import { AskInfoButton } from '@/components/ask-info-button';
 
 // ============================================================================
 // M-1 (Security Batch 1) — JSON-LD XSS protection.
@@ -211,45 +212,11 @@ function buildCourseJsonLd(f: FormationRow) {
     inLanguage: 'fr-FR',
   }];
 
-  // Offers — pour les diplomantes, un seul prix ; pour les certifiantes, 3 offres
+  // Offers — pour les diplomantes, un seul prix ; pour les certifiantes, "Sur demande" (pas de prix numérique)
   const offers: object[] = [];
   if (f.type === 'certifiante') {
-    if (f.priceIndividual) {
-      const p = parseFloat(f.priceIndividual);
-      if (!isNaN(p)) {
-        offers.push({
-          '@type': 'Offer',
-          name: 'Tarif individuel',
-          price: p,
-          priceCurrency: 'MAD',
-          category: 'Education',
-        });
-      }
-    }
-    if (f.priceGroup) {
-      const p = parseFloat(f.priceGroup);
-      if (!isNaN(p)) {
-        offers.push({
-          '@type': 'Offer',
-          name: 'Tarif groupe',
-          price: p,
-          priceCurrency: 'MAD',
-          category: 'Education',
-        });
-      }
-    }
-    if (f.priceEnterprise) {
-      const p = parseFloat(f.priceEnterprise);
-      if (!isNaN(p)) {
-        offers.push({
-          '@type': 'Offer',
-          name: 'Tarif entreprise',
-          price: p,
-          priceCurrency: 'MAD',
-          category: 'Education',
-        });
-      }
-    }
+    // Tarif sur demande — pas d'Offer numérique en JSON-LD (Google n'affichera aucun prix)
+    // (on garde `offers` vide — Google saura qu'il n'y a pas de prix public)
   } else {
     // Diplômante — prix unique
     if (f.price) {
@@ -575,21 +542,12 @@ export default async function FormationSeoPage({ params }: { params: Promise<{ s
               </div>
             ) : (
               <div className="text-center pb-4 border-b border-slate-100">
-                <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Tarifs</div>
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="bg-blue-50 rounded-lg p-2">
-                    <div className="text-[10px] text-blue-500 font-semibold uppercase">Individuel</div>
-                    <div className="text-sm font-bold text-blue-700 mt-1">{formation.priceIndividual || 'Sur demande'}</div>
-                  </div>
-                  <div className="bg-emerald-50 rounded-lg p-2">
-                    <div className="text-[10px] text-emerald-500 font-semibold uppercase">Groupe</div>
-                    <div className="text-sm font-bold text-emerald-700 mt-1">{formation.priceGroup || 'Sur demande'}</div>
-                  </div>
-                  <div className="bg-amber-50 rounded-lg p-2">
-                    <div className="text-[10px] text-amber-500 font-semibold uppercase">Entreprise</div>
-                    <div className="text-sm font-bold text-amber-700 mt-1">{formation.priceEnterprise || 'Sur demande'}</div>
-                  </div>
-                </div>
+                <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Tarif</div>
+                <div className="text-3xl font-extrabold text-slate-900">Sur demande</div>
+                <div className="text-sm text-slate-500 mt-1">Tarif communiqué après étude de votre demande</div>
+                <p className="text-xs text-slate-500 mt-3">
+                  Possibilité de suivre la formation en : Individuel / Groupe / Entreprise
+                </p>
               </div>
             )}
             <div className="space-y-3 text-sm">
@@ -619,17 +577,21 @@ export default async function FormationSeoPage({ params }: { params: Promise<{ s
               )}
             </div>
             <a
-              href={`/?formation=${publicSlug}&tab=${formation.type}`}
+              href={
+                formation.type === 'diplomante'
+                  ? `/inscriptions/${publicSlug}`
+                  : formation.type === 'certifiante'
+                  ? `/inscriptions-cert?formation=${publicSlug}`
+                  : `/?formation=${publicSlug}&tab=${formation.type}`
+              }
               className="block w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-4 rounded-lg text-center text-base transition-colors"
             >
               S'inscrire à cette formation
             </a>
-            <a
-              href="/"
-              className="block w-full text-center text-sm text-slate-600 hover:text-emerald-700 transition-colors"
-            >
-              Demander des informations
-            </a>
+            <AskInfoButton
+              formationTitle={formation.title}
+              formationLevel={levelLabels[formation.level] || formation.level}
+            />
           </div>
         </aside>
       </div>

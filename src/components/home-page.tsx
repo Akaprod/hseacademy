@@ -8,7 +8,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   GraduationCap, Users, Award, BookOpen, ArrowRight, Shield, Star, ChevronRight,
   Target, Clock, CheckCircle2, FileCheck, UserPlus, FileText, Sparkles,
+  CalendarDays, MessageCircle,
 } from 'lucide-react';
+import { HeroSlider } from '@/components/hero-slider';
+import { useAssistantStore } from '@/stores/assistant-store';
 
 interface HomePageProps {
   onNavigate: (page: string, data?: Record<string, string>) => void;
@@ -73,6 +76,9 @@ export default function HomePage({ onNavigate, user, onAuthOpen }: HomePageProps
 
   return (
     <div>
+      {/* === HERO SLIDER === Carrousel automatique 10s avec 4 slides promotionnels */}
+      <HeroSlider onNavigate={onNavigate} />
+
       {/* HERO */}
       <section className="relative gradient-hero text-white overflow-hidden">
         <div className="absolute inset-0 bg-pattern-dots opacity-10" />
@@ -117,41 +123,41 @@ export default function HomePage({ onNavigate, user, onAuthOpen }: HomePageProps
                 </div>
 
                 <div className="space-y-3">
-                  {/* === CTA 1 : S'inscrire maintenant === */}
+                  {/* === CTA 1 : Inscription à l'année scolaire 2026/2027 === */}
                   <button
-                    onClick={() => onAuthOpen?.('register')}
+                    onClick={() => onNavigate('formations')}
                     className="group w-full text-left bg-white hover:bg-slate-50 border border-slate-200 hover:border-emerald-400 hover:shadow-lg rounded-xl p-4 transition-all duration-200 cursor-pointer flex items-center gap-4"
-                    aria-label="S'inscrire maintenant"
+                    aria-label="Inscription à l'année scolaire 2026/2027"
                   >
                     <div className="w-11 h-11 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                      <UserPlus className="h-5 w-5 text-emerald-700 group-hover:text-white" />
+                      <CalendarDays className="h-5 w-5 text-emerald-700 group-hover:text-white" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm text-slate-900 group-hover:text-emerald-700 transition-colors">
-                        S&apos;inscrire maintenant
+                        Inscription à l&apos;année scolaire 2026/2027
                       </p>
                       <p className="text-xs text-slate-500 mt-0.5 leading-snug">
-                        Créez votre compte et accédez à votre espace personnel.
+                        Choisissez votre formation diplômante et déposez votre candidature.
                       </p>
                     </div>
                     <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-1 transition-all shrink-0" />
                   </button>
 
-                  {/* === CTA 2 : Obtenez votre première attestation QHSE gratuitement === */}
+                  {/* === CTA 2 : Vous avez des questions ? Demandez à notre assistant Lara === */}
                   <button
-                    onClick={() => onNavigate('training')}
+                    onClick={() => useAssistantStore.getState().openWithQuestion('Bonjour, je suis Lara, comment je peux vous aider ?')}
                     className="group w-full text-left bg-white hover:bg-slate-50 border border-slate-200 hover:border-emerald-400 hover:shadow-lg rounded-xl p-4 transition-all duration-200 cursor-pointer flex items-center gap-4"
-                    aria-label="Obtenez votre première attestation QHSE gratuitement"
+                    aria-label="Vous avez des questions ? Demandez à notre assistant"
                   >
-                    <div className="w-11 h-11 rounded-xl bg-amber-100 flex items-center justify-center shrink-0 group-hover:bg-amber-500 group-hover:text-white transition-colors">
-                      <Award className="h-5 w-5 text-amber-600 group-hover:text-white" />
+                    <div className="w-11 h-11 rounded-xl bg-sky-100 flex items-center justify-center shrink-0 group-hover:bg-sky-600 group-hover:text-white transition-colors">
+                      <MessageCircle className="h-5 w-5 text-sky-700 group-hover:text-white" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm text-slate-900 group-hover:text-emerald-700 transition-colors">
-                        Obtenez votre première attestation QHSE gratuitement
+                        Vous avez des questions ?
                       </p>
                       <p className="text-xs text-slate-500 mt-0.5 leading-snug">
-                        Découvrez une formation en ligne et obtenez votre première attestation.
+                        Discutez avec Lara, notre assistant IA. Réponse immédiate 24/7.
                       </p>
                     </div>
                     <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-1 transition-all shrink-0" />

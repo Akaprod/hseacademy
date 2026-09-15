@@ -116,6 +116,11 @@ export default function AuthModal({ open, onOpenChange, mode, onAuthSuccess }: A
             <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleLogin} disabled={loading}>
               {loading ? 'Connexion...' : 'Se connecter'}
             </Button>
+            <div className="text-center">
+              <a href="/reset-password" className="text-sm text-emerald-600 hover:text-emerald-700 hover:underline">
+                Mot de passe oublié ?
+              </a>
+            </div>
           </TabsContent>
 
           <TabsContent value="register" className="space-y-4 mt-4">

@@ -160,17 +160,26 @@ export async function POST(req: NextRequest) {
     // [7] Personnalité
     const behavior = await getBehavior();
 
-    // [8] Sources de connaissance (lecture DB publique)
-    const sources = await getRelevantSources(message);
-    const serializedSources = serializeSourcesForPrompt(sources);
-
-    // [9] Mémoire conversationnelle (10 derniers messages)
+    // [9] Mémoire conversationnelle (10 derniers messages) — loaded BEFORE sources
+    // pour permettre la résolution de références conversationnelles
     const conversationId = await getOrCreateConversation(
       userAuth?.id ?? null,
       resolvedMode,
       body.conversationId
     );
     const history = await getRecentMessages(conversationId, 10);
+
+    // [8] Sources de connaissance (lecture DB publique)
+    // Enrichir la query avec les 3 derniers messages utilisateur pour résoudre
+    // les références conversationnelles ("et pour le master ?" → "master" + contexte précédent)
+    const recentUserMessages = history
+      .filter(m => m.role === 'user')
+      .slice(-3)
+      .map(m => m.content)
+      .join(' ');
+    const enrichedQuery = recentUserMessages ? `${recentUserMessages} ${message}` : message;
+    const sources = await getRelevantSources(enrichedQuery);
+    const serializedSources = serializeSourcesForPrompt(sources);
 
     // [10] Assemblage du prompt système (hiérarchie immuable)
     // SYSTEM SAFETY → GENERAL → MODE → LIMITS → BEHAVIOR → KNOWLEDGE → CONTEXT

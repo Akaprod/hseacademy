@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Clock, Target, CheckCircle2, MapPin, Users, GraduationCap, ChevronRight, Briefcase, Flame, Shield, Zap, HardHat, Building2, Award, Heart, AlertTriangle, Factory, Star } from 'lucide-react';
+import { AskInfoButton } from '@/components/ask-info-button';
 
 interface FormationsPageProps {
   slug?: string;
@@ -195,21 +196,12 @@ export default function FormationsPage({ slug, tab, onNavigate }: FormationsPage
                   {selected.type === 'certifiante' ? (
                     <>
                       <div className="text-center pb-4 border-b border-slate-100">
-                        <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Tarifs</div>
-                        <div className="grid grid-cols-3 gap-2">
-                          <div className="bg-blue-50 rounded-lg p-3">
-                            <div className="text-[10px] text-blue-500 font-semibold uppercase">Individuel</div>
-                            <div className="text-base font-bold text-blue-700 mt-1">{selected.priceIndividual || 'Sur demande'}</div>
-                          </div>
-                          <div className="bg-emerald-50 rounded-lg p-3">
-                            <div className="text-[10px] text-emerald-500 font-semibold uppercase">Groupe</div>
-                            <div className="text-base font-bold text-emerald-700 mt-1">{selected.priceGroup || 'Sur demande'}</div>
-                          </div>
-                          <div className="bg-amber-50 rounded-lg p-3">
-                            <div className="text-[10px] text-amber-500 font-semibold uppercase">Entreprise</div>
-                            <div className="text-base font-bold text-amber-700 mt-1">{selected.priceEnterprise || 'Sur demande'}</div>
-                          </div>
-                        </div>
+                        <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Tarif</div>
+                        <div className="text-3xl font-extrabold text-slate-900">Sur demande</div>
+                        <div className="text-sm text-slate-500 mt-1">Tarif communiqué après étude de votre demande</div>
+                        <p className="text-xs text-slate-500 mt-3">
+                          Possibilité de suivre la formation en : Individuel / Groupe / Entreprise
+                        </p>
                       </div>
                     </>
                   ) : (
@@ -238,9 +230,39 @@ export default function FormationsPage({ slug, tab, onNavigate }: FormationsPage
                       </div>
                     )}
                   </div>
-                  <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-6 text-base" onClick={() => onNavigate('contact')}>
-                    Demander des informations
-                  </Button>
+                  <div className="space-y-2">
+                    {/* Bouton inscription — diplomante OU certifiante */}
+                    {selected.type === 'diplomante' ? (
+                      <Button
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-6 text-base"
+                        onClick={() => {
+                          // Navigation vers la page d'inscription diplômante (server-rendered)
+                          if (typeof window !== 'undefined') {
+                            window.location.href = `/inscriptions/${selected.slug}`;
+                          }
+                        }}
+                      >
+                        S'inscrire à cette formation
+                      </Button>
+                    ) : selected.type === 'certifiante' ? (
+                      <Button
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-6 text-base"
+                        onClick={() => {
+                          // Navigation vers le formulaire de demande certifiante (server-rendered)
+                          if (typeof window !== 'undefined') {
+                            window.location.href = `/inscriptions-cert?formation=${selected.slug}`;
+                          }
+                        }}
+                      >
+                        S'inscrire à cette formation
+                      </Button>
+                    ) : null}
+                    {/* Bouton "Demander des informations" — ouvre le bot Lara avec une question contextuelle */}
+                    <AskInfoButton
+                      formationTitle={selected.title}
+                      formationLevel={levelLabels[selected.level] || selected.level}
+                    />
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -381,19 +403,9 @@ export default function FormationsPage({ slug, tab, onNavigate }: FormationsPage
                     </div>
                     <h3 className="font-bold text-base text-slate-900 mb-2 group-hover:text-orange-600 transition-colors leading-tight">{f.title}</h3>
                     <p className="text-sm text-slate-500 leading-relaxed mb-4 line-clamp-2">{f.shortDescription}</p>
-                    <div className="grid grid-cols-3 gap-2 mb-3">
-                      <div className="text-center bg-blue-50 rounded-lg py-2 px-1">
-                        <div className="text-[9px] text-blue-500 font-semibold">Individuel</div>
-                        <div className="text-xs font-bold text-blue-700 mt-0.5">{f.priceIndividual || '—'}</div>
-                      </div>
-                      <div className="text-center bg-emerald-50 rounded-lg py-2 px-1">
-                        <div className="text-[9px] text-emerald-500 font-semibold">Groupe</div>
-                        <div className="text-xs font-bold text-emerald-700 mt-0.5">{f.priceGroup || '—'}</div>
-                      </div>
-                      <div className="text-center bg-amber-50 rounded-lg py-2 px-1">
-                        <div className="text-[9px] text-amber-500 font-semibold">Entreprise</div>
-                        <div className="text-xs font-bold text-amber-700 mt-0.5">{f.priceEnterprise || 'Sur demande'}</div>
-                      </div>
+                    <div className="bg-orange-50 rounded-lg py-2 px-3 mb-3 text-center">
+                      <div className="text-[9px] text-orange-500 font-semibold uppercase tracking-wider">Tarif</div>
+                      <div className="text-sm font-bold text-orange-700 mt-0.5">Sur demande</div>
                     </div>
                     <div className="flex items-center justify-between pt-3 border-t border-slate-100">
                       <span className="text-xs text-slate-400">{modeLabels[f.mode] || f.mode}</span>

@@ -33,6 +33,14 @@ model User {
   paymentRequests   PaymentRequest[]
   // Assistant IA — Phase 2 (mémoire conversationnelle future)
   assistantConversations AssistantConversation[]
+  // === Sécurité auth — Password reset + login attempts ===
+  passwordResetTokens   PasswordResetToken[]
+  failedLoginAttempts   Int      @default(0)
+  lockedUntil           DateTime?
+  passwordResetRequests Int      @default(0)
+  passwordResetBlockedUntil DateTime?
+  // === Sécurité — Modification compte (email/tel/password avec OTP email ===
+  securityChangeCodes   SecurityChangeCode[]
 }
 
 model Category {
@@ -971,4 +979,139 @@ model AssistantVisitorQuota {
   updatedAt     DateTime @updatedAt
 
   @@map("assistant_visitor_quota")
+}
+
+// ============================================================================
+// PASSWORD RESET — Sécurité auth
+// ============================================================================
+// Token aléatoire à usage unique, valable 10 minutes, hashé en DB.
+// Rate limiting : 3 demandes / 24h par utilisateur → blocage 24h.
+// ============================================================================
+
+model PasswordResetToken {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token       String    @unique  // Hash du token (pas le token brut)
+  expiresAt   DateTime             // 10 minutes
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+  ipAddress   String?              // IP de la demande (audit)
+
+  @@index([userId])
+}
+
+// ============================================================================
+// SECURITY CHANGE — Modification sécurisée du compte (email/tel/password)
+// ============================================================================
+// Code OTP à 6 chiffres, valable 10 minutes, usage unique, hashé en DB.
+// Un seul code actif à la fois par utilisateur + type de changement.
+// Rate limiting : 5 demandes / 1h par utilisateur (fenêtre glissante).
+// ============================================================================
+
+model SecurityChangeCode {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  changeType  String              // "email" | "phone" | "password"
+  codeHash    String    @unique   // Hash HMAC du code à 6 chiffres
+  pendingValue String             // Nouvelle valeur chiffrée/pending (email/phone). Pour password: hash bcrypt du nouveau password.
+  expiresAt   DateTime             // 10 minutes
+  usedAt      DateTime?
+  consumedAt  DateTime?            // Date effective du changement appliqué
+  createdAt   DateTime  @default(now())
+  ipAddress   String?
+
+  @@index([userId, changeType])
+}
+
+// ============================================================================
+// INSCRIPTION REQUEST — Candidature à une formation diplômante
+// ============================================================================
+// Soumis publiquement (sans auth) par un candidat sur /inscriptions/[slug]
+// Statut workflow : pending → reviewing → accepted/rejected/waitlisted
+// Données : identité + contact + scolarité + expérience HSE + formation visée
+// ============================================================================
+
+model InscriptionRequest {
+  id              String    @id @default(cuid())
+  // === Lien formation ===
+  formationSlug   String                      // slug de la Formation visée
+  formationLevel  String                      // "Qualification" | "Technicien" | "Technicien Spécialisé" | "Licence Professionnelle" | "Master Professionnel" | "VAE"
+  // === Identité ===
+  nom             String
+  prenom          String
+  genre           String                      // "M" | "F"
+  birthDate       DateTime?
+  residence       String?                     // "ville, pays"
+  nationalite     String?
+  // === Contact (ajouté par l'utilisateur — absent du Google Form original) ===
+  email           String
+  phone           String?
+  addressStreet   String?                     // rue, n°
+  addressCity     String?
+  addressPostalCode String?
+  addressCountry  String?
+  // === Scolarité ===
+  niveauScolaire  String?                      // "3ème collège" | "2ème bac" | "Baccalauréat" | "Bac + 2" | "Licence (Bac + 3)" | "Master" | "Doctorat"
+  dernierDiplome  String?
+  // === Expérience HSE ===
+  experienceHSE   String?                      // "Animateur" | "Superviseur" | "Responsable" | "Manager" | "Aucune"
+  // === Workflow ===
+  status          String    @default("pending") // pending | reviewing | accepted | rejected | waitlisted
+  adminNotes      String    @default("")       // Notes internes admin
+  reviewedBy      String?                       // userId admin qui a traité
+  reviewedAt      DateTime?
+  // === Métadonnées ===
+  ipAddress       String?
+  userAgent       String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([formationSlug])
+  @@index([status])
+  @@index([email])
+}
+
+// ============================================================================
+// CERTIFICATION REQUEST — Demande pour formation certifiante
+// ============================================================================
+// 3 modes : 'individuel' (contact <24h), 'groupe' (liste d'attente), 'entreprise' (contact <24h)
+// 14 formations certifiantes au choix via formationSlug, OU formationOther (texte libre)
+// Mode de formation : presentiel | ligne | hybride
+// Workflow : pending → contacted → liste_attente (groupe) → confirmed/rejected
+// ============================================================================
+
+model CertificationRequest {
+  id              String    @id @default(cuid())
+  // === Mode d'inscription ===
+  mode            String                    // "individuel" | "groupe" | "entreprise"
+  // === Formation visée ===
+  formationSlug   String?                   // slug d'une des 14 formations certifiantes (nullable si "Autre")
+  formationOther  String?                   // texte libre si "Autre formation"
+  // === Mode de formation souhaité ===
+  modeFormation   String                    // "presentiel" | "ligne" | "hybride"
+  // === Identité + Contact ===
+  nom             String
+  prenom          String
+  email           String
+  phone           String?
+  // === Champs spécifiques au mode ===
+  entreprise      String?                   // nom entreprise (mode=entreprise)
+  nbPersonnes     Int?                       // nombre de personnes (mode=groupe principalement)
+  // === Workflow ===
+  status          String    @default("pending") // pending | contacted | liste_attente | confirmed | rejected
+  adminNotes      String    @default("")
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  // === Métadonnées ===
+  ipAddress       String?
+  userAgent       String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([mode])
+  @@index([formationSlug])
+  @@index([status])
+  @@index([email])
 }

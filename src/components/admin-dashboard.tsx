@@ -10,7 +10,7 @@ import {
   Settings, Save, Scale, Globe, Wallet,
   Archive, ArchiveRestore, ExternalLink,
   BarChart2, MapPin, Link2, RefreshCw,
-  Sparkles,
+  Sparkles, ClipboardList, ClipboardCheck,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -38,6 +38,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AssistantAdminSection } from '@/components/assistant-admin-section';
+import { AdminInscriptionsSection } from '@/components/admin-inscriptions-section';
+import { AdminCertificationRequestsSection } from '@/components/admin-certification-requests-section';
 
 // ============================================================
 // TYPES
@@ -71,7 +73,7 @@ interface OverviewStats {
   totalTestimonials: number; totalPages: number; totalMenus: number;
 }
 
-type Section = 'dashboard' | 'articles' | 'certifications' | 'formationsDiplomantes' | 'formationsCertifiantes' | 'categories' | 'pages' | 'menus' | 'comments' | 'newsletter' | 'contacts' | 'users' | 'userDetail' | 'testimonials' | 'payments' | 'legal' | 'paymentSettings' | 'siteProfile' | 'stats' | 'assistant';
+type Section = 'dashboard' | 'articles' | 'certifications' | 'formationsDiplomantes' | 'formationsCertifiantes' | 'categories' | 'pages' | 'menus' | 'comments' | 'newsletter' | 'contacts' | 'users' | 'userDetail' | 'testimonials' | 'payments' | 'legal' | 'paymentSettings' | 'siteProfile' | 'stats' | 'assistant' | 'inscriptions' | 'certificationRequests';
 
 interface NavItem {
   id: Section;
@@ -456,6 +458,8 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
     { id: 'comments', label: 'Commentaires', icon: MessageSquare },
     { id: 'newsletter', label: 'Newsletter', icon: Mail },
     { id: 'contacts', label: 'Messages', icon: Mail },
+    { id: 'inscriptions', label: 'Inscriptions Diplômantes', icon: ClipboardList },
+    { id: 'certificationRequests', label: 'Inscriptions Certifiantes', icon: ClipboardCheck },
     { id: 'users', label: 'Utilisateurs', icon: Users },
     { id: 'testimonials', label: 'Témoignages', icon: Star },
     { id: 'payments', label: 'Paiements', icon: CreditCard },
@@ -4811,6 +4815,8 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
       case 'siteProfile': return renderSiteProfile();
       case 'stats': return renderStats();
       case 'assistant': return <AssistantAdminSection />;
+      case 'inscriptions': return <AdminInscriptionsSection />;
+      case 'certificationRequests': return <AdminCertificationRequestsSection />;
       default: return null;
     }
   };

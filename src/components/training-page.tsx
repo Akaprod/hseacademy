@@ -141,6 +141,22 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
     }
   }, [view, currentChapterIdx]);
 
+  // ============================================================================
+  // Reset examResult quand on change de chapitre — sécurité anti-état-stale
+  // ============================================================================
+  // Sans ce reset, si l'utilisateur passe l'exam du chapitre N (examResult défini),
+  // puis navigue au chapitre N+1 via un autre chemin (sidebar, bouton "Précédent"
+  // puis "Suivant" dans 'learn', etc.), examResult reste défini. Si plus tard il
+  // revient en 'examResult' (par exemple en re-cliquant sur "Passer l'examen" puis
+  // en soumettant), il y a un risque d'afficher un score mismatch.
+  // Ce useEffect garantit que examResult est toujours reset quand on change de
+  // chapitre, peu importe le chemin.
+  // ============================================================================
+  useEffect(() => {
+    setExamResult(null);
+    setAnswers({});
+  }, [currentChapterIdx]);
+
   /* ---- helpers ---- */
   const requireAuth = () => {
     if (!user) { onAuthOpen('login'); return false; }
@@ -298,6 +314,29 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
     setAnswers({});
     setExamResult(null);
     setView('exam');
+  };
+
+  // ============================================================================
+  // goToNextChapter — passe au chapitre suivant depuis la vue examResult
+  // ============================================================================
+  // BUGFIX : avant, le bouton "Chapitre suivant" dans examResult appelait
+  // directement loadChapter() qui ne changeait PAS `view` (restait à 'examResult')
+  // et ne resetait PAS `examResult`. L'utilisateur restait donc sur la vue
+  // examResult (titre du chapitre changeait mais le score/réponses restaient
+  // les anciens), et devait cliquer plusieurs fois pour "passer" au chapitre
+  // suivant — en réalité il sautait 3 chapitres d'un coup car chaque clic
+  // incrémentait currentChapterIdx sans changer la vue.
+  //
+  // Maintenant : on reset examResult + answers, on charge le nouveau chapitre,
+  // et on bascule vers la vue 'learn' (vue d'apprentissage du chapitre suivant).
+  // ============================================================================
+  const goToNextChapter = (nextIdx: number) => {
+    const next = chapters[nextIdx];
+    if (!next) return;
+    setExamResult(null);
+    setAnswers({});
+    setView('learn');
+    loadChapter(next.id, nextIdx);
   };
 
   const submitExam = async () => {
@@ -1044,10 +1083,7 @@ export default function TrainingPage({ user, onAuthOpen, onNavigate }: TrainingP
               </Button>
             )}
             {examResult.passed && !isLastChapter && (
-              <Button onClick={() => {
-                const next = chapters[currentChapterIdx + 1];
-                if (next) loadChapter(next.id, currentChapterIdx + 1);
-              }}>
+              <Button onClick={() => goToNextChapter(currentChapterIdx + 1)}>
                 Chapitre suivant <ArrowRight className="h-4 w-4 ml-1" />
               </Button>
             )}

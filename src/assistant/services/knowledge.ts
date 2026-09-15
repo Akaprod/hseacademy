@@ -132,8 +132,7 @@ async function readSourceData(
             id: true, title: true, slug: true,
             shortDescription: true, fullDescription: true,
             level: true, type: true, duration: true, mode: true,
-            priceIndividual: true, priceGroup: true, priceEnterprise: true,
-            objectives: true,
+            objectives: true, prerequisites: true,
           },
           take: 20,
         });
@@ -146,15 +145,19 @@ async function readSourceData(
           if (isCatalogQuery || isRelevant(text, queryLower)) {
             // Format lisible avec type en préfixe pour que le LLM distingue
             // formations diplômantes (longues, hybride) vs certifiantes (courtes, présentiel)
+            // NB : AUCUN prix n'est exposé à Lara — les tarifs sont "Sur demande"
+            // (communiqués par l'équipe après étude de la demande). Lara doit orienter
+            // les utilisateurs vers le formulaire d'inscription plutôt que d'inventer
+            // des prix. Voir instructions/edu-lara-01.ts et defaults.ts.
             const typeLabel = f.type === 'diplomante' ? 'DIPLÔMANTE' : 'CERTIFIANTE';
             const levelLabel = f.level || 'N/A';
-            const priceInfo = f.priceIndividual ? ` | Prix: ${f.priceIndividual}` : '';
+            const prereqInfo = f.prerequisites ? ` | Prérequis: ${f.prerequisites}` : '';
             const objInfo = objectives.length > 0 ? ` | Objectifs: ${objectives.slice(0, 3).join(', ')}` : '';
             sources.push({
               category: 'formations',
               refId: f.slug || f.id,
               title: `[${typeLabel}] ${f.title}`,
-              content: `${f.shortDescription || ''} | Niveau: ${levelLabel} | Durée: ${f.duration} | Mode: ${f.mode}${priceInfo}${objInfo}`,
+              content: `${f.shortDescription || ''} | Niveau: ${levelLabel} | Durée: ${f.duration} | Mode: ${f.mode}${prereqInfo}${objInfo} | Tarif: Sur demande`,
               publicUrl: f.slug ? `/formations?f=${f.slug}` : undefined,
               contentHash: '',
               syncedAt: now,

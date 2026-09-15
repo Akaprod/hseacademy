@@ -102,6 +102,7 @@ export async function getStatus(): Promise<AssistantStatus> {
   }
   return {
     enabled: config.enabled,
+    welcomeMessage: config.welcomeMessage,
     name: config.name,
     modes: {
       commercial: config.commercialEnabled,

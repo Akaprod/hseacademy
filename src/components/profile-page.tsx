@@ -21,6 +21,7 @@ import {
   Mail, Phone, Shield, ShieldCheck, ShieldAlert, Lock, User, Calendar,
   MapPin, Home, Facebook, Linkedin, Twitter, Globe, Award, Play,
   FileCheck, ExternalLink, Loader2, CheckCircle, BookOpen, Wallet, Upload, Trash2, AlertTriangle, FileText, Palette, Clock,
+  KeyRound, Smartphone,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -264,6 +265,110 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
   const [savingSocial, setSavingSocial] = useState(false);
   const [sendingVerification, setSendingVerification] = useState(false);
   const [countdown, setCountdown] = useState(0); // Cooldown "Renvoyer" (60s)
+
+  // --- Onglet "Infos de sécurité" (modification email/tel/password avec OTP) ---
+  type SecurityChangeType = 'email' | 'phone' | 'password';
+  // Pour chaque type : nouvelle valeur + (password only) ancien mot de passe
+  const [secChangeType, setSecChangeType] = useState<SecurityChangeType | null>(null);
+  const [secNewValue, setSecNewValue] = useState('');
+  const [secCurrentValue, setSecCurrentValue] = useState(''); // password only
+  const [secConfirmValue, setSecConfirmValue] = useState(''); // password only (confirm)
+  const [secInitiating, setSecInitiating] = useState(false);
+  const [secCode, setSecCode] = useState('');
+  const [secVerifying, setSecVerifying] = useState(false);
+  // Pendant la phase OTP, on retient le type en cours (pour afficher le formulaire de saisie du code)
+  const [secOtpPending, setSecOtpPending] = useState<SecurityChangeType | null>(null);
+  const [secCooldown, setSecCooldown] = useState(0); // 60s entre 2 demandes
+  useEffect(() => {
+    if (secCooldown > 0) {
+      const t = setTimeout(() => setSecCooldown(secCooldown - 1), 1000);
+      return () => clearTimeout(t);
+    }
+  }, [secCooldown]);
+
+  const resetSecForm = () => {
+    setSecChangeType(null);
+    setSecNewValue('');
+    setSecCurrentValue('');
+    setSecConfirmValue('');
+    setSecCode('');
+    setSecOtpPending(null);
+  };
+
+  // Initier un changement : appelle /api/profile/security/initiate
+  const handleSecurityInitiate = async () => {
+    if (!secChangeType) return;
+    if (!secNewValue) {
+      toast.error('Veuillez saisir la nouvelle valeur');
+      return;
+    }
+    if (secChangeType === 'password') {
+      if (!secCurrentValue) {
+        toast.error('Veuillez saisir votre mot de passe actuel');
+        return;
+      }
+      if (secNewValue !== secConfirmValue) {
+        toast.error('Les mots de passe ne correspondent pas');
+        return;
+      }
+    }
+    setSecInitiating(true);
+    try {
+      const res = await fetch('/api/profile/security/initiate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          changeType: secChangeType,
+          newValue: secNewValue,
+          currentValue: secChangeType === 'password' ? secCurrentValue : undefined,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        toast.error(json.error || 'Erreur lors de la demande');
+        return;
+      }
+      toast.success(json.message || 'Code envoyé par email');
+      setSecOtpPending(secChangeType);
+      setSecCooldown(60);
+    } catch (err) {
+      console.error('Security initiate error:', err);
+      toast.error('Erreur réseau');
+    } finally {
+      setSecInitiating(false);
+    }
+  };
+
+  // Vérifier le code OTP et appliquer le changement
+  const handleSecurityVerify = async () => {
+    if (!secOtpPending) return;
+    if (!secCode || !/^\d{6}$/.test(secCode)) {
+      toast.error('Code invalide (6 chiffres requis)');
+      return;
+    }
+    setSecVerifying(true);
+    try {
+      const res = await fetch('/api/profile/security/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ changeType: secOtpPending, code: secCode }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        toast.error(json.error || 'Erreur lors de la vérification');
+        return;
+      }
+      toast.success(json.message || 'Modification appliquée avec succès');
+      resetSecForm();
+      // Recharger le profil pour refléter les changements (email/tel/verified flags)
+      fetchProfile();
+    } catch (err) {
+      console.error('Security verify error:', err);
+      toast.error('Erreur réseau');
+    } finally {
+      setSecVerifying(false);
+    }
+  };
 
   // Countdown timer pour le bouton "Renvoyer" (60 secondes)
   useEffect(() => {
@@ -828,6 +933,9 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
               <TabsTrigger value="account" className="gap-1.5">
                 <Shield className="h-4 w-4" /> Mon compte
               </TabsTrigger>
+              <TabsTrigger value="security" className="gap-1.5">
+                <Lock className="h-4 w-4" /> Infos de sécurité
+              </TabsTrigger>
               <TabsTrigger value="identity" className="gap-1.5">
                 <User className="h-4 w-4" /> Mon identité
               </TabsTrigger>
@@ -986,6 +1094,237 @@ export default function ProfilePage({ user, onNavigate, onLogout, initialTab }: 
                     Votre adresse email est vérifiée. Aucune action supplémentaire n&apos;est requise.
                   </p>
                 )}
+
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ============================ A2: Infos de sécurité ============================ */}
+          <TabsContent value="security" className="mt-6">
+            <Card className="border-slate-200 shadow-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-emerald-700">
+                  <Lock className="h-5 w-5" /> Infos de sécurité
+                </CardTitle>
+                <CardDescription>
+                  Modifiez votre email, téléphone ou mot de passe. Chaque modification est validée par un code à 6 chiffres envoyé par email (valable 10 minutes).
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+
+                {/* Bloc info : valeurs actuelles */}
+                <div className="grid sm:grid-cols-3 gap-3">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Mail className="h-4 w-4 text-emerald-600" />
+                      <span className="text-xs font-medium text-slate-500 uppercase">Email</span>
+                    </div>
+                    <div className="text-sm font-semibold text-slate-900 break-all">{user?.email || '—'}</div>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Phone className="h-4 w-4 text-emerald-600" />
+                      <span className="text-xs font-medium text-slate-500 uppercase">Téléphone</span>
+                    </div>
+                    <div className="text-sm font-semibold text-slate-900 break-all">{phoneValue}</div>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <KeyRound className="h-4 w-4 text-emerald-600" />
+                      <span className="text-xs font-medium text-slate-500 uppercase">Mot de passe</span>
+                    </div>
+                    <div className="text-sm font-semibold text-slate-900">••••••••</div>
+                  </div>
+                </div>
+
+                {/* Phase 1 : choix du type + saisie nouvelle valeur */}
+                {!secOtpPending && (
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="text-sm font-semibold text-slate-700">Que souhaitez-vous modifier ?</Label>
+                      <div className="grid sm:grid-cols-3 gap-2 mt-2">
+                        <Button
+                          type="button"
+                          variant={secChangeType === 'email' ? 'default' : 'outline'}
+                          onClick={() => { setSecChangeType('email'); setSecNewValue(''); setSecCurrentValue(''); setSecConfirmValue(''); }}
+                          className={secChangeType === 'email' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
+                        >
+                          <Mail className="h-4 w-4 mr-1.5" /> Email
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={secChangeType === 'phone' ? 'default' : 'outline'}
+                          onClick={() => { setSecChangeType('phone'); setSecNewValue(''); setSecCurrentValue(''); setSecConfirmValue(''); }}
+                          className={secChangeType === 'phone' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
+                        >
+                          <Smartphone className="h-4 w-4 mr-1.5" /> Téléphone
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={secChangeType === 'password' ? 'default' : 'outline'}
+                          onClick={() => { setSecChangeType('password'); setSecNewValue(''); setSecCurrentValue(''); setSecConfirmValue(''); }}
+                          className={secChangeType === 'password' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
+                        >
+                          <KeyRound className="h-4 w-4 mr-1.5" /> Mot de passe
+                        </Button>
+                      </div>
+                    </div>
+
+                    {secChangeType === 'email' && (
+                      <div className="space-y-2">
+                        <Label htmlFor="sec-new-email" className="text-sm font-semibold text-slate-700">Nouvel email</Label>
+                        <Input
+                          id="sec-new-email"
+                          type="email"
+                          placeholder="nouvel@email.com"
+                          value={secNewValue}
+                          onChange={(e) => setSecNewValue(e.target.value)}
+                        />
+                        <p className="text-xs text-slate-500">
+                          Un code de confirmation sera envoyé à votre adresse email actuelle (<strong>{user?.email}</strong>). Vous devrez saisir ce code pour valider le changement.
+                        </p>
+                      </div>
+                    )}
+
+                    {secChangeType === 'phone' && (
+                      <div className="space-y-2">
+                        <Label htmlFor="sec-new-phone" className="text-sm font-semibold text-slate-700">Nouveau numéro de téléphone</Label>
+                        <Input
+                          id="sec-new-phone"
+                          type="tel"
+                          placeholder="+212 6 XX XX XX XX"
+                          value={secNewValue}
+                          onChange={(e) => setSecNewValue(e.target.value)}
+                        />
+                        <p className="text-xs text-slate-500">
+                          Format international recommandé. Un code de confirmation sera envoyé par email.
+                        </p>
+                      </div>
+                    )}
+
+                    {secChangeType === 'password' && (
+                      <div className="space-y-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="sec-cur-pwd" className="text-sm font-semibold text-slate-700">Mot de passe actuel</Label>
+                          <Input
+                            id="sec-cur-pwd"
+                            type="password"
+                            placeholder="Votre mot de passe actuel"
+                            value={secCurrentValue}
+                            onChange={(e) => setSecCurrentValue(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="sec-new-pwd" className="text-sm font-semibold text-slate-700">Nouveau mot de passe</Label>
+                          <Input
+                            id="sec-new-pwd"
+                            type="password"
+                            placeholder="Au moins 8 caractères, 1 maj, 1 min, 1 chiffre, 1 spécial"
+                            value={secNewValue}
+                            onChange={(e) => setSecNewValue(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="sec-confirm-pwd" className="text-sm font-semibold text-slate-700">Confirmer le nouveau mot de passe</Label>
+                          <Input
+                            id="sec-confirm-pwd"
+                            type="password"
+                            placeholder="Confirmez le nouveau mot de passe"
+                            value={secConfirmValue}
+                            onChange={(e) => setSecConfirmValue(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {secChangeType && (
+                      <div className="flex gap-3">
+                        <Button
+                          type="button"
+                          onClick={handleSecurityInitiate}
+                          disabled={secInitiating || secCooldown > 0}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                        >
+                          {secInitiating ? (
+                            <><Loader2 className="h-4 w-4 animate-spin" /> Envoi du code…</>
+                          ) : secCooldown > 0 ? (
+                            <><Clock className="h-4 w-4" /> Renvoyer dans {secCooldown}s</>
+                          ) : (
+                            <><Mail className="h-4 w-4" /> Envoyer le code</>
+                          )}
+                        </Button>
+                        <Button type="button" variant="outline" onClick={resetSecForm}>
+                          Annuler
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Phase 2 : saisie du code OTP */}
+                {secOtpPending && (
+                  <div className="space-y-4 border-t border-slate-200 pt-4">
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                      <p className="text-sm text-emerald-800">
+                        Un code à 6 chiffres a été envoyé à <strong>{user?.email}</strong>.
+                        Saisissez-le ci-dessous pour valider la modification de votre{' '}
+                        {secOtpPending === 'email' ? 'email' : secOtpPending === 'phone' ? 'téléphone' : 'mot de passe'}.
+                      </p>
+                      <p className="text-xs text-emerald-700 mt-1">Le code est valable 10 minutes.</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="sec-code" className="text-sm font-semibold text-slate-700">Code de confirmation (6 chiffres)</Label>
+                      <Input
+                        id="sec-code"
+                        inputMode="numeric"
+                        pattern="\d{6}"
+                        maxLength={6}
+                        placeholder="______"
+                        value={secCode}
+                        onChange={(e) => setSecCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        className="text-2xl tracking-[0.5em] text-center font-mono"
+                      />
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                      <Button
+                        type="button"
+                        onClick={handleSecurityVerify}
+                        disabled={secVerifying || secCode.length !== 6}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                      >
+                        {secVerifying ? (
+                          <><Loader2 className="h-4 w-4 animate-spin" /> Vérification…</>
+                        ) : (
+                          <><CheckCircle className="h-4 w-4" /> Valider la modification</>
+                        )}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleSecurityInitiate}
+                        disabled={secInitiating || secCooldown > 0}
+                      >
+                        {secCooldown > 0 ? `Renvoyer dans ${secCooldown}s` : 'Renvoyer le code'}
+                      </Button>
+                      <Button type="button" variant="ghost" onClick={resetSecForm}>
+                        Annuler
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Note de sécurité */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+                  <Shield className="h-4 w-4 text-blue-700 mt-0.5 shrink-0" />
+                  <div className="text-xs text-blue-800">
+                    <p className="font-medium">Pourquoi cette vérification ?</p>
+                    <p className="mt-1 text-blue-700">
+                      Toute modification de votre email, téléphone ou mot de passe nécessite une confirmation par email.
+                      Cela garantit que vous êtes bien à l&apos;origine du changement et protège votre compte contre les modifications non autorisées.
+                      Le code est unique, valable 10 minutes, et envoyé uniquement à votre adresse email actuelle.
+                    </p>
+                  </div>
+                </div>
 
               </CardContent>
             </Card>

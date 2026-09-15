@@ -13,6 +13,9 @@ import { Button } from '@/components/ui/button';
 import { X, Send, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAssistantStore } from '@/stores/assistant-store';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeSanitize from 'rehype-sanitize';
 
 interface Message { role: 'user' | 'assistant'; content: string; ts: number; }
 interface Status {
@@ -31,13 +34,14 @@ const SUGGESTIONS = [
 ];
 
 export function AssistantWidget() {
-  const { isOpen, setOpen } = useAssistantStore();
+  const { isOpen, setOpen, pendingQuestion, setPendingQuestion } = useAssistantStore();
   const [status, setStatus] = useState<Status | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   // Phase 4 : conservation du conversationId pour la mémoire conversationnelle
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [authUserId, setAuthUserId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -74,16 +78,79 @@ export function AssistantWidget() {
   // ============================================================================
   useEffect(() => {
     // Only set welcome if messages is still empty (first mount)
+    // Wait for status to be loaded so we use the admin-configured welcomeMessage
+    const welcome = status?.welcomeMessage || "Bonjour, je suis l'Assistant IA de HSE Academy. Comment puis-je vous aider ?";
     setMessages(prev => prev.length === 0 ? [{
       role: 'assistant',
-      content: `Bonjour 👋 Je suis l'assistant de HSE Academy.\nJe peux vous aider concernant nos formations, cours en ligne et informations disponibles sur la plateforme.`,
+      content: welcome,
       ts: Date.now(),
     }] : prev);
-  }, []);
+  }, [status?.welcomeMessage]);
+
+  // === Auth state detection — reset conversation when user logs in/out ===
+  // Quand l'utilisateur se connecte ou se déconnecte, on reset la conversation
+  // pour ne pas afficher l'historique visiteur à un utilisateur connecté.
+  useEffect(() => {
+    let mounted = true;
+    async function checkAuth() {
+      try {
+        const res = await fetch('/api/auth/me', { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          const newUserId = data?.user?.id || null;
+          if (newUserId !== authUserId) {
+            // Auth state changed — reset conversation
+            setAuthUserId(newUserId);
+            setMessages([]);
+            setConversationId(null);
+          }
+        } else if (authUserId !== null) {
+          // Was logged in, now logged out — reset
+          setAuthUserId(null);
+          setMessages([]);
+          setConversationId(null);
+        }
+      } catch {
+        // Silent — don't disrupt the chat on auth check failure
+      }
+    }
+    checkAuth();
+    const interval = setInterval(checkAuth, 5000); // check every 5s
+    return () => { mounted = false; clearInterval(interval); };
+  }, [authUserId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages]);
+
+  // ============================================================================
+  // Auto-send de la pendingQuestion quand le widget s'ouvre
+  // ============================================================================
+  // Permet aux boutons externes (ex : "Demander des informations" sur les pages
+  // de formation) d'ouvrir le widget ET de déclencher automatiquement l'envoi
+  // d'une question contextuelle.
+  //
+  // Mécanisme :
+  //   - Le bouton externe appelle `useAssistantStore.getState().openWithQuestion(q)`
+  //   - Le store met isOpen=true + pendingQuestion=q
+  //   - Ce useEffect détecte le changement, attend 1 render complet du widget,
+  //     puis appelle handleSendRef.current(q) pour envoyer le message
+  //   - Après envoi, pendingQuestion est reset (usage unique)
+  // ============================================================================
+  const handleSendRef = useRef<(text?: string) => void>(() => {});
+
+  useEffect(() => {
+    if (isOpen && pendingQuestion) {
+      // Petit délai pour laisser le welcome message + panneau se rendre
+      const t = setTimeout(() => {
+        if (pendingQuestion) {
+          handleSendRef.current(pendingQuestion);
+          setPendingQuestion(null);
+        }
+      }, 250);
+      return () => clearTimeout(t);
+    }
+  }, [isOpen, pendingQuestion, setPendingQuestion]);
 
   if (!isOpen) return null;
 
@@ -134,6 +201,10 @@ export function AssistantWidget() {
     }
   };
 
+  // Mise à jour de la ref pour permettre à l'useEffect "pendingQuestion" d'appeler handleSend
+  // (handleSend est défini après les useEffect à cause du pattern `if (!isOpen) return null`)
+  handleSendRef.current = handleSend;
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
@@ -178,7 +249,11 @@ export function AssistantWidget() {
                     ? 'bg-emerald-600 text-white rounded-br-md'
                     : 'bg-white border border-slate-200 text-slate-700 rounded-bl-md shadow-sm'
                 }`}>
-                  <p className="whitespace-pre-wrap">{m.content}</p>
+                  <div className="prose prose-sm max-w-none prose-p:my-0 prose-ul:my-1 prose-li:my-0 prose-headings:my-1 prose-strong:text-inherit prose-a:text-emerald-600">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
+                      {m.content}
+                    </ReactMarkdown>
+                  </div>
                 </div>
               </div>
             ))}

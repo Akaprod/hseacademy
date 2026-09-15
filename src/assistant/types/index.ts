@@ -71,6 +71,7 @@ export interface AssistantSourceConfigData {
 
 export interface AssistantStatus {
   enabled: boolean;
+  welcomeMessage: string;
   name: string;
   modes: { commercial: boolean; user: boolean; admin: boolean };
   aiProviderConfigured: boolean;

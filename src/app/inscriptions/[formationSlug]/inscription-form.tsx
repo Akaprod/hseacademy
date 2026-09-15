@@ -488,7 +488,7 @@ export default function InscriptionForm({ formation }: { formation: FormationDat
                 En soumettant ce formulaire, vous acceptez que les informations fournies soient traitées par HSE Academy
                 (Institut International des Compétences Professionnelles QHSE) aux fins d'examen de votre demande d'inscription.
                 Vos données ne seront pas partagées avec des tiers. Vous pouvez exercer votre droit d'accès, de rectification
-                et de suppression en nous contactant à contact@institutqhse.com.
+                et de suppression en nous contactant à contact@hseacademy.online.
               </div>
             </CardContent>
           </Card>

@@ -160,9 +160,9 @@ export default function Footer({ onNavigate }: FooterProps) {
                 </a>
               </li>
               <li>
-                <a href="mailto:contact@institutqhse.com" className="flex items-center gap-2.5 text-sm text-slate-400 hover:text-emerald-400 transition-colors">
+                <a href="mailto:contact@hseacademy.online" className="flex items-center gap-2.5 text-sm text-slate-400 hover:text-emerald-400 transition-colors">
                   <Mail className="h-4 w-4 text-emerald-400 shrink-0" />
-                  contact@institutqhse.com
+                  contact@hseacademy.online
                 </a>
               </li>
               {/* Réseaux sociaux IICP */}

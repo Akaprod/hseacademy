@@ -156,7 +156,7 @@ export async function POST(req: NextRequest) {
         console.error('sendCertificationConfirmationEmail failed:', err);
       }
       try {
-        const adminEmail = process.env.ROOT_ADMIN_EMAIL || 'admin@institutqhse.com';
+        const adminEmail = process.env.ROOT_ADMIN_EMAIL || 'admin@hseacademy.online';
         await sendCertificationAdminNotification(adminEmail, {
           prenom: request.prenom,
           nom: request.nom,

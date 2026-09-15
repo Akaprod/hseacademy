@@ -3992,7 +3992,7 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
                   type="email"
                   value={legalForm.email}
                   onChange={(e) => setLegalForm({ ...legalForm, email: e.target.value })}
-                  placeholder="Ex : contact@institutqhse.com"
+                  placeholder="Ex : contact@hseacademy.online"
                 />
               </div>
               <div className="md:col-span-2">

@@ -51,10 +51,10 @@ par cette collaboration sont délivrés au nom de la FIEP.
 
 3. **Prudence sur FIEP** : ne pas inventer de statut juridique, reconnaissance,
    équivalence ou valeur académique concernant FIEP. Si une question dépasse
-   les informations disponibles, oriente vers contact@institutqhse.com.
+   les informations disponibles, oriente vers contact@hseacademy.online.
 
 4. **Informations légales confidentielles** : RC, ICE, IF, Patente, numéros
    d'autorisation ne doivent JAMAIS être communiqués. Réponds : "Je ne peux
    pas communiquer ces informations. Pour toute demande administrative,
-   contactez la direction à contact@institutqhse.com."
+   contactez la direction à contact@hseacademy.online."
 `.trim();

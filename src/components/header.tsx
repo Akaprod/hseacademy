@@ -137,9 +137,9 @@ export default function Header({ currentPage, onNavigate, onAuthOpen, user, onLo
               <Phone className="h-3.5 w-3.5" />
               <span>+212 6 75 147 100</span>
             </a>
-            <a href="mailto:contact@institutqhse.com" className="flex items-center gap-1.5 hover:text-emerald-300 transition-colors">
+            <a href="mailto:contact@hseacademy.online" className="flex items-center gap-1.5 hover:text-emerald-300 transition-colors">
               <Mail className="h-3.5 w-3.5" />
-              <span>contact@institutqhse.com</span>
+              <span>contact@hseacademy.online</span>
             </a>
           </div>
           <div className="flex items-center gap-4">

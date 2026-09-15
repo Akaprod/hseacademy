@@ -149,7 +149,12 @@ export async function POST(req: NextRequest) {
     }
 
     // [5] Contexte utilisateur autorisé (READ-ONLY)
-    const userContext = await getAuthorizedContext(userAuth);
+    // Mission 2/3 : on passe le message utilisateur pour que le mode admin
+    // puisse résoudre l'utilisateur ciblé côté serveur (par email OU téléphone).
+    // Un USER normal n'activera jamais adminTargetContext ni adminNeedsIdentity
+    // (vérification auth.role === 'admin' côté serveur).
+    // Par nom seul, on NE résout JAMAIS — Lara demande un email/téléphone.
+    const userContext = await getAuthorizedContext(userAuth, { adminMessage: message });
     const serializedContext = serializeContextForPrompt(userContext);
 
     // [6] Instructions (générales + mode + limits)

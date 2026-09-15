@@ -226,7 +226,7 @@ export async function sendSecurityAlertEmail(
           <p style="color: #334155; font-size: 15px; line-height: 1.6;">${recommendation}</p>
           ${ipAddress ? `<p style="color: #64748b; font-size: 13px;">Adresse IP détectée : ${ipAddress}</p>` : ''}
           <p style="color: #64748b; font-size: 13px; margin-top: 16px;">
-            Si ce n'était pas vous, contactez-nous à contact@institutqhse.com.
+            Si ce n'était pas vous, contactez-nous à contact@hseacademy.online.
           </p>
         </div>
       `,

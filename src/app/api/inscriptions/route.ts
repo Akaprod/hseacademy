@@ -146,7 +146,7 @@ export async function POST(req: NextRequest) {
       }
       try {
         // Notification à l'admin (adresse root admin du .env)
-        const adminEmail = process.env.ROOT_ADMIN_EMAIL || 'admin@institutqhse.com';
+        const adminEmail = process.env.ROOT_ADMIN_EMAIL || 'admin@hseacademy.online';
         await sendInscriptionAdminNotification(adminEmail, {
           prenom: inscription.prenom,
           nom: inscription.nom,

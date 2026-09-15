@@ -74,7 +74,7 @@ export default function ContactPage() {
                     </div>
                     <div>
                       <div className="font-medium text-sm text-slate-900">Email</div>
-                      <a href="mailto:Contact@hseacademy.com" className="text-sm text-emerald-600 hover:underline">Contact@hseacademy.com</a>
+                      <a href="mailto:contact@hseacademy.online" className="text-sm text-emerald-600 hover:underline">contact@hseacademy.online</a>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">

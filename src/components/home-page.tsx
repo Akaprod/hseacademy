@@ -76,149 +76,110 @@ export default function HomePage({ onNavigate, user, onAuthOpen }: HomePageProps
 
   return (
     <div>
-      {/* === HERO SLIDER === Carrousel automatique 10s avec 4 slides promotionnels */}
-      <HeroSlider onNavigate={onNavigate} />
-
-      {/* HERO */}
-      <section className="relative gradient-hero text-white overflow-hidden">
-        <div className="absolute inset-0 bg-pattern-dots opacity-10" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-20 lg:py-24">
-          {/* Layout 2 colonnes : message principal à gauche, 3 opportunités à droite */}
-          <div className="grid lg:grid-cols-12 gap-10 lg:gap-12 items-center">
-
-            {/* === COLONNE GAUCHE : Message principal + CTAs existants === */}
-            <div className="lg:col-span-7 max-w-3xl">
-              <Badge className="bg-emerald-500/20 text-emerald-200 border-emerald-400/30 mb-5 text-sm px-3 py-1">
-                <Award className="h-3.5 w-3.5 mr-1.5" />
-                Formations Diplômantes QHSE
-              </Badge>
-              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight mb-5 animate-fade-in-up">
-                Formez-vous aux métiers du{' '}
-                <span className="text-emerald-300">Qualité, Hygiène, Sécurité & Environnement</span>
-              </h1>
-              <p className="text-base md:text-lg text-slate-200 mb-7 max-w-2xl leading-relaxed animate-fade-in-up stagger-2">
-                L&apos;Institut International des Compétences Professionnelles (IICP) vous propose des formations diplômantes
-                en ligne, accessibles à tous et alignées sur les standards internationaux QHSE.
+      {/* === HERO UNIFIÉ === Slides (fond rotatif) + panneau "Commencez votre parcours" (fixe à droite) */}
+      <HeroSlider
+        onNavigate={onNavigate}
+        rightPanel={
+          <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-5 sm:p-6 shadow-2xl">
+            <div className="flex items-center gap-2 mb-4">
+              <Sparkles className="h-4 w-4 text-emerald-200" />
+              <p className="text-sm font-semibold text-emerald-100 uppercase tracking-wider">
+                Commencez votre parcours
               </p>
-              <div className="flex flex-col sm:flex-row gap-3 animate-fade-in-up stagger-3">
-                <Button size="lg" className="bg-amber-500 hover:bg-amber-600 text-white font-semibold px-8" onClick={() => onNavigate('formations')}>
-                  <GraduationCap className="h-5 w-5 mr-2" />
-                  Découvrir nos formations
-                </Button>
-                <Button size="lg" className="border-2 border-white/60 bg-transparent text-white hover:bg-white/15 hover:border-white px-8" onClick={() => onNavigate('verification')}>
-                  <FileCheck className="h-5 w-5 mr-2" />
-                  Vérifier un diplôme
-                </Button>
-              </div>
             </div>
 
-            {/* === COLONNE DROITE : "Commencez votre parcours" + 3 cartes d'opportunités === */}
-            <div className="lg:col-span-5 animate-fade-in-up stagger-3">
-              <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-5 sm:p-6 shadow-2xl">
-                <div className="flex items-center gap-2 mb-4">
-                  <Sparkles className="h-4 w-4 text-emerald-200" />
-                  <p className="text-sm font-semibold text-emerald-100 uppercase tracking-wider">
-                    Commencez votre parcours
+            <div className="space-y-3">
+              {/* === CTA 1 : Inscription à l'année scolaire 2026/2027 === */}
+              <button
+                onClick={() => onNavigate('formations')}
+                className="group w-full text-left bg-white hover:bg-slate-50 border border-slate-200 hover:border-emerald-400 hover:shadow-lg rounded-xl p-4 transition-all duration-200 cursor-pointer flex items-center gap-4"
+                aria-label="Inscription à l'année scolaire 2026/2027"
+              >
+                <div className="w-11 h-11 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                  <CalendarDays className="h-5 w-5 text-emerald-700 group-hover:text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm text-slate-900 group-hover:text-emerald-700 transition-colors">
+                    Inscription à l&apos;année scolaire 2026/2027
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5 leading-snug">
+                    Choisissez votre formation diplômante et déposez votre candidature.
                   </p>
                 </div>
+                <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-1 transition-all shrink-0" />
+              </button>
 
-                <div className="space-y-3">
-                  {/* === CTA 1 : Inscription à l'année scolaire 2026/2027 === */}
-                  <button
-                    onClick={() => onNavigate('formations')}
-                    className="group w-full text-left bg-white hover:bg-slate-50 border border-slate-200 hover:border-emerald-400 hover:shadow-lg rounded-xl p-4 transition-all duration-200 cursor-pointer flex items-center gap-4"
-                    aria-label="Inscription à l'année scolaire 2026/2027"
-                  >
-                    <div className="w-11 h-11 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                      <CalendarDays className="h-5 w-5 text-emerald-700 group-hover:text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm text-slate-900 group-hover:text-emerald-700 transition-colors">
-                        Inscription à l&apos;année scolaire 2026/2027
-                      </p>
-                      <p className="text-xs text-slate-500 mt-0.5 leading-snug">
-                        Choisissez votre formation diplômante et déposez votre candidature.
-                      </p>
-                    </div>
-                    <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-1 transition-all shrink-0" />
-                  </button>
-
-                  {/* === CTA 2 : Vous avez des questions ? Demandez à notre assistant Lara === */}
-                  <button
-                    onClick={() => useAssistantStore.getState().openWithQuestion('Bonjour, je suis Lara, comment je peux vous aider ?')}
-                    className="group w-full text-left bg-white hover:bg-slate-50 border border-slate-200 hover:border-emerald-400 hover:shadow-lg rounded-xl p-4 transition-all duration-200 cursor-pointer flex items-center gap-4"
-                    aria-label="Vous avez des questions ? Demandez à notre assistant"
-                  >
-                    <div className="w-11 h-11 rounded-xl bg-sky-100 flex items-center justify-center shrink-0 group-hover:bg-sky-600 group-hover:text-white transition-colors">
-                      <MessageCircle className="h-5 w-5 text-sky-700 group-hover:text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm text-slate-900 group-hover:text-emerald-700 transition-colors">
-                        Vous avez des questions ?
-                      </p>
-                      <p className="text-xs text-slate-500 mt-0.5 leading-snug">
-                        Discutez avec Lara, notre assistant IA. Réponse immédiate 24/7.
-                      </p>
-                    </div>
-                    <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-1 transition-all shrink-0" />
-                  </button>
-
-                  {/* === CTA 3 : Créez votre CV Premium gratuitement === */}
-                  <button
-                    onClick={() => {
-                      // Si utilisateur connecté → onglet CV du profil
-                      // Sinon → ouvrir la modal d'inscription (l'utilisateur créera son CV après)
-                      if (user) {
-                        onNavigate('profile', { tab: 'cv' });
-                      } else {
-                        onAuthOpen?.('register');
-                      }
-                    }}
-                    className="group w-full text-left bg-white hover:bg-slate-50 border border-slate-200 hover:border-emerald-400 hover:shadow-lg rounded-xl p-4 transition-all duration-200 cursor-pointer flex items-center gap-4"
-                    aria-label="Créez votre CV Premium gratuitement"
-                  >
-                    <div className="w-11 h-11 rounded-xl bg-sky-100 flex items-center justify-center shrink-0 group-hover:bg-sky-600 group-hover:text-white transition-colors">
-                      <FileText className="h-5 w-5 text-sky-600 group-hover:text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm text-slate-900 group-hover:text-emerald-700 transition-colors">
-                        Créez votre CV Premium gratuitement
-                      </p>
-                      <p className="text-xs text-slate-500 mt-0.5 leading-snug">
-                        Créez votre CV professionnel et partagez-le facilement.
-                      </p>
-                    </div>
-                    <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-1 transition-all shrink-0" />
-                  </button>
+              {/* === CTA 2 : Vous avez des questions ? Demandez à notre assistant Lara === */}
+              <button
+                onClick={() => useAssistantStore.getState().openWithQuestion('Bonjour, je suis Lara, comment je peux vous aider ?')}
+                className="group w-full text-left bg-white hover:bg-slate-50 border border-slate-200 hover:border-emerald-400 hover:shadow-lg rounded-xl p-4 transition-all duration-200 cursor-pointer flex items-center gap-4"
+                aria-label="Vous avez des questions ? Demandez à notre assistant"
+              >
+                <div className="w-11 h-11 rounded-xl bg-sky-100 flex items-center justify-center shrink-0 group-hover:bg-sky-600 group-hover:text-white transition-colors">
+                  <MessageCircle className="h-5 w-5 text-sky-700 group-hover:text-white" />
                 </div>
-
-                {/* === Indicateurs de confiance — uniquement des faits réels supportés par la plateforme === */}
-                <div className="mt-5 pt-4 border-t border-white/15 grid grid-cols-3 gap-2 text-center">
-                  <div className="flex flex-col items-center gap-1">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-300" />
-                    <span className="text-[10px] uppercase tracking-wide text-emerald-100/90 leading-tight">
-                      En ligne
-                    </span>
-                  </div>
-                  <div className="flex flex-col items-center gap-1">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-300" />
-                    <span className="text-[10px] uppercase tracking-wide text-emerald-100/90 leading-tight">
-                      1<sup>re</sup> attestation gratuite
-                    </span>
-                  </div>
-                  <div className="flex flex-col items-center gap-1">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-300" />
-                    <span className="text-[10px] uppercase tracking-wide text-emerald-100/90 leading-tight">
-                      CV gratuit
-                    </span>
-                  </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm text-slate-900 group-hover:text-emerald-700 transition-colors">
+                    Vous avez des questions ?
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5 leading-snug">
+                    Discutez avec Lara, notre assistant IA. Réponse immédiate 24/7.
+                  </p>
                 </div>
+                <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-1 transition-all shrink-0" />
+              </button>
+
+              {/* === CTA 3 : Créez votre CV Premium gratuitement === */}
+              <button
+                onClick={() => {
+                  if (user) {
+                    onNavigate('profile', { tab: 'cv' });
+                  } else {
+                    onAuthOpen?.('register');
+                  }
+                }}
+                className="group w-full text-left bg-white hover:bg-slate-50 border border-slate-200 hover:border-emerald-400 hover:shadow-lg rounded-xl p-4 transition-all duration-200 cursor-pointer flex items-center gap-4"
+                aria-label="Créez votre CV Premium gratuitement"
+              >
+                <div className="w-11 h-11 rounded-xl bg-sky-100 flex items-center justify-center shrink-0 group-hover:bg-sky-600 group-hover:text-white transition-colors">
+                  <FileText className="h-5 w-5 text-sky-600 group-hover:text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm text-slate-900 group-hover:text-emerald-700 transition-colors">
+                    Créez votre CV Premium gratuitement
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5 leading-snug">
+                    Créez votre CV professionnel et partagez-le facilement.
+                  </p>
+                </div>
+                <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-1 transition-all shrink-0" />
+              </button>
+            </div>
+
+            {/* === Indicateurs de confiance === */}
+            <div className="mt-5 pt-4 border-t border-white/15 grid grid-cols-3 gap-2 text-center">
+              <div className="flex flex-col items-center gap-1">
+                <CheckCircle2 className="h-4 w-4 text-emerald-300" />
+                <span className="text-[10px] uppercase tracking-wide text-emerald-100/90 leading-tight">
+                  En ligne
+                </span>
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <CheckCircle2 className="h-4 w-4 text-emerald-300" />
+                <span className="text-[10px] uppercase tracking-wide text-emerald-100/90 leading-tight">
+                  1<sup>re</sup> attestation gratuite
+                </span>
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <CheckCircle2 className="h-4 w-4 text-emerald-300" />
+                <span className="text-[10px] uppercase tracking-wide text-emerald-100/90 leading-tight">
+                  CV gratuit
+                </span>
               </div>
             </div>
           </div>
-        </div>
-        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white to-transparent" />
-      </section>
+        }
+      />
 
       {/* STATS */}
       <section className="relative -mt-8 z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -487,7 +448,7 @@ export default function HomePage({ onNavigate, user, onAuthOpen }: HomePageProps
                 <Button size="lg" className="bg-amber-500 hover:bg-amber-600 text-white font-semibold px-8" onClick={() => onNavigate('contact')}>
                   Nous contacter
                 </Button>
-                <Button size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10 px-8" onClick={() => onNavigate('formations')}>
+                <Button size="lg" variant="outline" className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-500 px-8" onClick={() => onNavigate('formations')}>
                   Voir les programmes
                 </Button>
               </div>

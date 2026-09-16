@@ -103,13 +103,14 @@ export const HSE_SLIDES: Slide[] = [
 interface HeroSliderProps {
   onNavigate?: (page: string, data?: Record<string, string>) => void;
   slides?: Slide[];
-  intervalMs?: number; // par défaut 10000ms = 10s
+  intervalMs?: number;
+  rightPanel?: React.ReactNode;
 }
 
 // ============================================================================
 // Composant
 // ============================================================================
-export function HeroSlider({ onNavigate, slides = HSE_SLIDES, intervalMs = 10000 }: HeroSliderProps) {
+export function HeroSlider({ onNavigate, slides = HSE_SLIDES, intervalMs = 10000, rightPanel }: HeroSliderProps) {
   const [current, setCurrent] = useState(0);
   const [paused, setPaused] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -186,37 +187,49 @@ export function HeroSlider({ onNavigate, slides = HSE_SLIDES, intervalMs = 10000
             <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-transparent" />
           </div>
 
-          {/* Contenu */}
-          <div className="relative h-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col justify-center">
-            <div className="max-w-2xl">
-              {/* Badge */}
-              <div className="inline-flex items-center gap-2 bg-emerald-500/20 backdrop-blur-md border border-emerald-400/40 text-emerald-100 text-xs sm:text-sm font-semibold px-3 py-1.5 rounded-full mb-4 animate-[fade-in_0.6s_ease-out]">
-                <Sparkles className="h-3.5 w-3.5" />
-                {slide.badge}
+          {/* Contenu — 2 colonnes : slides à gauche (rotatif), panneau fixe à droite */}
+          <div className="relative h-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center">
+            <div className="grid lg:grid-cols-12 gap-6 lg:gap-10 w-full items-center">
+
+              {/* === COLONNE GAUCHE : Contenu du slide (rotatif) === */}
+              <div className="lg:col-span-7 max-w-2xl">
+                {/* Badge */}
+                <div className="inline-flex items-center gap-2 bg-emerald-500/20 backdrop-blur-md border border-emerald-400/40 text-emerald-100 text-xs sm:text-sm font-semibold px-3 py-1.5 rounded-full mb-4 animate-[fade-in_0.6s_ease-out]">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {slide.badge}
+                </div>
+
+                {/* Titre */}
+                <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight mb-4 animate-[fade-in_0.7s_ease-out]">
+                  <span className="text-white">{slide.title}</span>{' '}
+                  <span className="text-emerald-300">{slide.highlight}</span>
+                </h2>
+
+                {/* Sous-titre */}
+                <p className="text-base sm:text-lg md:text-xl text-slate-200 mb-6 leading-relaxed max-w-2xl animate-[fade-in_0.8s_ease-out]">
+                  {slide.subtitle}
+                </p>
+
+                {/* CTA */}
+                <div className="animate-[fade-in_0.9s_ease-out]">
+                  <Button
+                    size="lg"
+                    onClick={() => handleCta(slide)}
+                    className="bg-emerald-500 hover:bg-emerald-400 text-white font-semibold px-6 sm:px-8 py-6 text-base shadow-lg shadow-emerald-500/30 hover:shadow-emerald-400/50 transition-all group"
+                  >
+                    {slide.cta.label}
+                    <ArrowRight className="h-5 w-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                  </Button>
+                </div>
               </div>
 
-              {/* Titre */}
-              <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold text-white leading-tight mb-4 animate-[fade-in_0.7s_ease-out]">
-                {slide.title}{' '}
-                <span className="text-emerald-300">{slide.highlight}</span>
-              </h2>
+              {/* === COLONNE DROITE : Panneau fixe (ne tourne pas) === */}
+              {rightPanel && (
+                <div className="lg:col-span-5 hidden lg:block">
+                  {rightPanel}
+                </div>
+              )}
 
-              {/* Sous-titre */}
-              <p className="text-base sm:text-lg md:text-xl text-slate-200 mb-6 leading-relaxed max-w-2xl animate-[fade-in_0.8s_ease-out]">
-                {slide.subtitle}
-              </p>
-
-              {/* CTA */}
-              <div className="animate-[fade-in_0.9s_ease-out]">
-                <Button
-                  size="lg"
-                  onClick={() => handleCta(slide)}
-                  className="bg-emerald-500 hover:bg-emerald-400 text-white font-semibold px-6 sm:px-8 py-6 text-base shadow-lg shadow-emerald-500/30 hover:shadow-emerald-400/50 transition-all group"
-                >
-                  {slide.cta.label}
-                  <ArrowRight className="h-5 w-5 ml-2 group-hover:translate-x-1 transition-transform" />
-                </Button>
-              </div>
             </div>
           </div>
         </div>

@@ -1,10 +1,6 @@
 // ============================================================================
 // SYSTEM SAFETY RULES — CODED IN STONE, NEVER EDITABLE, NEVER STORED IN DB
 // ============================================================================
-// ⚠️ Ces règles sont OBLIGATOIRES et IMMUABLES. Elles sont ajoutées EN TÊTE
-// du prompt système envoyé au modèle IA, AVANT toute instruction éditable.
-// Aucune instruction admin ne peut les contourner.
-// ============================================================================
 
 export const SYSTEM_SAFETY_RULES = `
 # RÈGLES DE SÉCURITÉ SYSTÈME — OBLIGATOIRES ET IMMUABLES

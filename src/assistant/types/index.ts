@@ -95,7 +95,7 @@ export interface ChatResponse {
 // ============================================================================
 // CONTEXTE UTILISATEUR AUTORISÉ (résolu serveur-side, READ-ONLY)
 // ============================================================================
-// Étendu Mission 2 — ajoute :
+// Mission 2/3 — ajoute :
 //   - walletSummary : solde + devise + 10 dernières transactions (entrées/sorties)
 //   - attestationsSummary : attestations de l'utilisateur (statut + score)
 //   - adminTargetContext : si admin ET message mentionne un autre utilisateur
@@ -105,40 +105,32 @@ export interface ChatResponse {
 //     on ne résout JAMAIS (nom = identifiant non unique). Lara doit demander
 //     un email ou un téléphone.
 // ============================================================================
-// RÈGLE D'IDENTITÉ CRITIQUE :
-//   - EMAIL = identifiant unique (User.email @unique en DB).
-//   - TÉLÉPHONE = identifiant unique (en pratique — pas de doublon en DB).
-//   - NOM/PRÉNOM = JAMAIS un identifiant unique. Ne JAMAIS résoudre un user
-//     par son nom, même si un seul "Farid" existe en DB.
-// ============================================================================
 
 export interface WalletTransactionSummary {
-  type: string;            // charge | purchase | refund | bonus
-  amount: number;          // toujours positif (sens déterminé par type)
+  type: string;
+  amount: number;
   description: string;
   paymentMethod?: string | null;
-  createdAt: string;       // ISO date
+  createdAt: string;
 }
 
 export interface WalletSummary {
   balance: number;
-  currency: string;        // "MAD" par défaut
-  recentTransactions: WalletTransactionSummary[]; // 10 dernières
-  totalCharges: number;    // somme des charges VALIDÉES + bonus + refund (entrées créditées)
-  totalPurchases: number;  // somme des purchase (sorties)
+  currency: string;
+  recentTransactions: WalletTransactionSummary[];
+  totalCharges: number;
+  totalPurchases: number;
 }
 
 export interface AttestationSummary {
   courseName: string;
   score: number | null;
   serialNumber: string;
-  issuedDate: string;      // ISO date
+  issuedDate: string;
   status?: string;
 }
 
 export interface AdminTargetContext {
-  // Résolu serveur-side UNIQUEMENT par email OU téléphone (jamais par nom).
-  // Le serveur parse le message, extrait un identifiant unique, vérifie en DB.
   targetUserId: string;
   targetUserName: string;
   targetUserEmail: string;
@@ -150,9 +142,7 @@ export interface AdminTargetContext {
 }
 
 export interface AdminNeedsIdentity {
-  // Quand l'admin mentionne un utilisateur par nom seul, on ne résout JAMAIS.
-  // On signale à Lara qu'elle doit demander un email ou un téléphone.
-  detectedName: string;  // le nom détecté dans le message admin
+  detectedName: string;
 }
 
 export interface AuthorizedUserContext {
@@ -169,14 +159,8 @@ export interface AuthorizedUserContext {
     publicProfileUrl?: string | null;
   };
   enrollmentsSummary?: Array<{ courseTitle: string; status: string; overallScore?: number; }>;
-  // Mission 2 — Wallet (solde + historique)
   walletSummary?: WalletSummary;
-  // Mission 2 — Attestations
   attestationsSummary?: AttestationSummary[];
-  // Mission 2/3 — Mode admin : si admin ET identifiant unique (email/tél) valide fourni,
-  // contexte ciblé (RÉSOLU SERVEUR-SIDE — ne trust jamais email/ID du message).
   adminTargetContext?: AdminTargetContext;
-  // Mission 3 — Mode admin : si admin mentionne un user par nom seul, on ne résout pas.
-  // Lara doit demander un email ou téléphone pour identifier.
   adminNeedsIdentity?: AdminNeedsIdentity;
 }

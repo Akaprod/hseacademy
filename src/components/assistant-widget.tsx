@@ -21,6 +21,7 @@ interface Message { role: 'user' | 'assistant'; content: string; ts: number; }
 interface Status {
   enabled: boolean;
   name: string;
+  welcomeMessage: string;
   modes: { commercial: boolean; user: boolean; admin: boolean };
   aiProviderConfigured: boolean;
   version: string;
@@ -77,9 +78,12 @@ export function AssistantWidget() {
   // closes the panel (X button preserves state via Zustand isOpen toggle).
   // ============================================================================
   useEffect(() => {
-    // Only set welcome if messages is still empty (first mount)
-    // Wait for status to be loaded so we use the admin-configured welcomeMessage
-    const welcome = status?.welcomeMessage || "Bonjour, je suis l'Assistant IA de HSE Academy. Comment puis-je vous aider ?";
+    // ATTENDRE que status soit chargé avant de mettre le welcome message.
+    // Sinon, on met le fallback avant que l'API réponde, puis quand le vrai
+    // welcomeMessage arrive, messages.length n'est plus 0 → le vrai message
+    // n'est jamais mis (race condition).
+    if (!status) return;
+    const welcome = status.welcomeMessage || "Bonjour, je suis l'Assistant IA de HSE Academy. Comment puis-je vous aider ?";
     setMessages(prev => prev.length === 0 ? [{
       role: 'assistant',
       content: welcome,
@@ -99,16 +103,30 @@ export function AssistantWidget() {
           const data = await res.json();
           const newUserId = data?.user?.id || null;
           if (newUserId !== authUserId) {
-            // Auth state changed — reset conversation
+            // Auth state changed — reset conversation + re-set welcome message
             setAuthUserId(newUserId);
-            setMessages([]);
             setConversationId(null);
+            // IMPORTANT : ne pas faire setMessages([]) car cela efface le welcome
+            // message et le welcome useEffect ne re-déclenche pas (ses deps
+            // [status?.welcomeMessage] n'ont pas changé). On remet directement
+            // le welcome message.
+            const welcome = status?.welcomeMessage || "Bonjour, je suis l'Assistant IA de HSE Academy. Comment puis-je vous aider ?";
+            setMessages([{
+              role: 'assistant',
+              content: welcome,
+              ts: Date.now(),
+            }]);
           }
         } else if (authUserId !== null) {
-          // Was logged in, now logged out — reset
+          // Was logged in, now logged out — reset + re-set welcome
           setAuthUserId(null);
-          setMessages([]);
           setConversationId(null);
+          const welcome = status?.welcomeMessage || "Bonjour, je suis l'Assistant IA de HSE Academy. Comment puis-je vous aider ?";
+          setMessages([{
+            role: 'assistant',
+            content: welcome,
+            ts: Date.now(),
+          }]);
         }
       } catch {
         // Silent — don't disrupt the chat on auth check failure
@@ -117,7 +135,7 @@ export function AssistantWidget() {
     checkAuth();
     const interval = setInterval(checkAuth, 5000); // check every 5s
     return () => { mounted = false; clearInterval(interval); };
-  }, [authUserId]);
+  }, [authUserId, status]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });

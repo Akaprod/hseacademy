@@ -131,7 +131,7 @@ export default function FormationsPage({ slug, tab, onNavigate }: FormationsPage
                 </Badge>
               )}
             </div>
-            <h1 className="text-3xl md:text-4xl font-extrabold mb-4">{selected.title}</h1>
+            <h1 className="text-3xl md:text-4xl font-extrabold mb-4 text-white">{selected.title}</h1>
             <p className="text-lg text-slate-200 max-w-3xl leading-relaxed">{selected.shortDescription}</p>
           </div>
         </section>

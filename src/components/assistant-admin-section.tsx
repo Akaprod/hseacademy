@@ -28,6 +28,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Sparkles, Save, Shield, Lock, Database, BookOpen, FileText, Globe,
   Settings, Sliders, AlertTriangle, CheckCircle2, XCircle, Bot, GraduationCap,
+  RefreshCw, Clock,
 } from 'lucide-react';
 import { LLMConfigTab } from '@/components/assistant-llm-config-tab';
 import { LaraConfigPanel } from '@/components/lara-config-panel';
@@ -90,6 +91,8 @@ export function AssistantAdminSection() {
   const [editingInstructions, setEditingInstructions] = useState<Record<string, string>>({});
   const [editingBehavior, setEditingBehavior] = useState<AssistantBehavior | null>(null);
   const [editingConfig, setEditingConfig] = useState<AssistantConfig | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [lastAutoSync, setLastAutoSync] = useState<string | null>(null);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -184,6 +187,36 @@ export function AssistantAdminSection() {
       else { toast.error('Erreur'); setSources(prev => prev.map(s => s.category === category ? { ...s, enabled: !enabled } : s)); }
     } catch { toast.error('Erreur réseau'); setSources(prev => prev.map(s => s.category === category ? { ...s, enabled: !enabled } : s)); }
   };
+
+  // === Mise à jour manuelle des sources ===
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const res = await fetch('/api/assistant/sources/sync', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSources(data.sources || []);
+        setLastAutoSync(data.syncedAt);
+        toast.success('Sources mises à jour');
+      } else {
+        toast.error(data.error || 'Erreur');
+      }
+    } catch { toast.error('Erreur réseau'); }
+    finally { setSyncing(false); }
+  };
+
+  // === Auto-sync : déclenche une mise à jour au montage + toutes les heures ===
+  useEffect(() => {
+    // Sync immédiat au montage du composant
+    handleSync();
+    // Auto-sync toutes les heures (3600000 ms)
+    const interval = setInterval(() => {
+      fetch('/api/assistant/sources/sync').catch(() => {});
+    }, 3600000);
+    return () => clearInterval(interval);
+  }, []);
 
   if (loading) {
     return (
@@ -608,18 +641,38 @@ export function AssistantAdminSection() {
         <TabsContent value="sources">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Database className="h-4 w-4 text-emerald-600" /> Sources de connaissance
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Database className="h-4 w-4 text-emerald-600" /> Sources de connaissance
+                </CardTitle>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleSync}
+                  disabled={syncing}
+                  className="gap-1.5"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${syncing ? 'animate-spin' : ''}`} />
+                  {syncing ? 'Synchronisation...' : 'Mise à jour'}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600">
-                <p className="font-semibold text-slate-700 mb-1">Architecture future (Phase 3)</p>
-                <p>
-                  L'assistant utilisera automatiquement les informations publiées sur HSE Academy.
-                  Principe : <em>CONTENU PUBLIÉ → DÉTECTION DE CHANGEMENT → MISE À JOUR → ASSISTANT</em>.
-                  Les sources ci-dessous sont préparées — la synchronisation sera activée en Phase 3.
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800">
+                <p className="font-semibold flex items-center gap-1.5 mb-1">
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Synchronisation active
                 </p>
+                <p>
+                  Les sources sont synchronisées automatiquement à chaque consultation de Lara
+                  (lecture en temps réel de la DB). Cliquez sur "Mise à jour" pour forcer le
+                  re-comptage des documents et rafraîchir les statistiques ci-dessous.
+                </p>
+                {lastAutoSync && (
+                  <p className="mt-1.5 flex items-center gap-1 text-emerald-700">
+                    <Clock className="h-3 w-3" />
+                    Dernière mise à jour : {new Date(lastAutoSync).toLocaleString('fr-FR')}
+                  </p>
+                )}
               </div>
 
               {/* Sources publiques (activation on/off) */}

@@ -64,6 +64,10 @@ export default function Page() {
     // Force le remontage du composant cible (utile quand on revient sur la
     // même page — ex. "Formation en Ligne" alors qu'on est déjà dessus).
     setNavKey(k => k + 1);
+    // Remonter en haut de page à chaque navigation (surtout pour "Accueil")
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   }, []);
 
   const handleAuthOpen = useCallback((mode: 'login' | 'register') => {

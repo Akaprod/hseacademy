@@ -1106,7 +1106,7 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
       )}
 
       {/* Article Modal */}
-      <Dialog open={articleModalOpen} onOpenChange={setArticleModalOpen}>
+      <Dialog open={articleModalOpen} onOpenChange={(open) => { setArticleModalOpen(open); if (!open) setEditingArticle(null); }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingArticle ? 'Modifier l\'article' : 'Nouvel article'}</DialogTitle>
@@ -1263,7 +1263,7 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
         </>
       )}
 
-      <Dialog open={certModalOpen} onOpenChange={setCertModalOpen}>
+      <Dialog open={certModalOpen} onOpenChange={(open) => { setCertModalOpen(open); if (!open) setEditingCert(null); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{editingCert ? 'Modifier la certification' : 'Nouvelle certification'}</DialogTitle>
@@ -1630,9 +1630,7 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
                 <TableHead className="hidden md:table-cell">Catégorie</TableHead>
                 <TableHead className="hidden lg:table-cell">Mode</TableHead>
                 <TableHead className="hidden md:table-cell">Durée</TableHead>
-                <TableHead className="hidden lg:table-cell">Indiv.</TableHead>
-                <TableHead className="hidden lg:table-cell">Groupe</TableHead>
-                <TableHead className="hidden lg:table-cell">Entreprise</TableHead>
+                <TableHead className="hidden lg:table-cell">Tarif</TableHead>
                 <TableHead className="hidden xl:table-cell">Statut</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -1649,9 +1647,7 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
                   <TableCell className="hidden md:table-cell text-sm">{levelLabels[f.level] || f.level}</TableCell>
                   <TableCell className="hidden lg:table-cell text-sm">{modeLabels[f.mode] || f.mode}</TableCell>
                   <TableCell className="hidden md:table-cell text-sm text-slate-600">{f.duration}</TableCell>
-                  <TableCell className="hidden lg:table-cell text-sm">{f.priceIndividual || '-'}</TableCell>
-                  <TableCell className="hidden lg:table-cell text-sm">{f.priceGroup || '-'}</TableCell>
-                  <TableCell className="hidden lg:table-cell text-sm">{f.priceEnterprise || '-'}</TableCell>
+                  <TableCell className="hidden lg:table-cell text-sm font-medium text-slate-700">Sur demande</TableCell>
                   <TableCell className="hidden xl:table-cell">
                     {f.archived ? (
                       <Badge variant="outline" className="bg-slate-100 text-slate-600 border-slate-200">Archivée</Badge>
@@ -1672,7 +1668,7 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
 
   // ----- Shared Dialog (Tabs: Général / Spécifique / SEO) -----
   const renderFormationDialog = () => (
-    <Dialog open={formationModalOpen} onOpenChange={setFormationModalOpen}>
+    <Dialog open={formationModalOpen} onOpenChange={(open) => { setFormationModalOpen(open); if (!open) setEditingFormation(null); }}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
@@ -2072,7 +2068,7 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
         </div>
       )}
 
-      <Dialog open={catModalOpen} onOpenChange={setCatModalOpen}>
+      <Dialog open={catModalOpen} onOpenChange={(open) => { setCatModalOpen(open); if (!open) setEditingCat(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{editingCat ? 'Modifier la catégorie' : 'Nouvelle catégorie'}</DialogTitle>
@@ -2279,7 +2275,7 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
         </>
       )}
 
-      <Dialog open={pageModalOpen} onOpenChange={setPageModalOpen}>
+      <Dialog open={pageModalOpen} onOpenChange={(open) => { setPageModalOpen(open); if (!open) setEditingPage(null); }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingPage ? 'Modifier la page' : 'Nouvelle page SEO'}</DialogTitle>
@@ -2518,7 +2514,7 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
         </Card>
       )}
 
-      <Dialog open={menuModalOpen} onOpenChange={setMenuModalOpen}>
+      <Dialog open={menuModalOpen} onOpenChange={(open) => { setMenuModalOpen(open); if (!open) setEditingMenu(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{editingMenu ? 'Modifier le menu' : 'Nouvel élément de menu'}</DialogTitle>
@@ -3820,7 +3816,7 @@ export default function AdminDashboard({ user, onNavigate, onLogout }: AdminDash
         </div>
       )}
 
-      <Dialog open={testiModalOpen} onOpenChange={setTestiModalOpen}>
+      <Dialog open={testiModalOpen} onOpenChange={(open) => { setTestiModalOpen(open); if (!open) setEditingTesti(null); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{editingTesti ? 'Modifier le témoignage' : 'Nouveau témoignage'}</DialogTitle>

@@ -4,8 +4,22 @@ import bcrypt from 'bcryptjs';
 import { setSessionCookie } from '@/lib/auth';
 import { passwordSchema, emailSchema, validateAndNormalizePhone, fullNameSchema } from '@/lib/validation';
 import { generateVerificationToken, hashToken, sendVerificationEmail, isEmailConfigured } from '@/lib/email';
+import { checkIpRateLimit, getClientIP } from '@/lib/rate-limit';
+
+// Rate limit IP: 5 inscriptions / heure
+const RATE_LIMIT_MAX = 5;
+const RATE_LIMIT_WINDOW = 60 * 60 * 1000;
 
 export async function POST(request: NextRequest) {
+  // Rate limit par IP
+  const clientIP = getClientIP(request);
+  const rl = checkIpRateLimit(clientIP, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Trop de demandes. Réessayez dans une heure.' },
+      { status: 429 }
+    );
+  }
   try {
     const body = await request.json();
     const { name, email, password, confirmPassword, phone, phoneCountry } = body;
@@ -51,7 +65,12 @@ export async function POST(request: NextRequest) {
       where: { email: { equals: normalizedEmail } },
     });
     if (existingEmail) {
-      return NextResponse.json({ error: 'Cet email est déjà utilisé' }, { status: 409 });
+      // Anti-énumération : ne pas révéler que l'email existe.
+      // Retourner 200 comme si tout s'était bien passé (comme forgot-password).
+      return NextResponse.json({
+        success: true,
+        message: 'Si cet email n\'est pas déjà utilisé, un email de vérification a été envoyé.',
+      });
     }
 
     // --- Téléphone unique (si fourni) ---
@@ -60,7 +79,11 @@ export async function POST(request: NextRequest) {
         where: { phoneNormalized },
       });
       if (existingPhone) {
-        return NextResponse.json({ error: 'Ce numéro de téléphone est déjà utilisé' }, { status: 409 });
+        // Anti-énumération : même réponse générique
+        return NextResponse.json({
+          success: true,
+          message: 'Si cet email n\'est pas déjà utilisé, un email de vérification a été envoyé.',
+        });
       }
     }
 

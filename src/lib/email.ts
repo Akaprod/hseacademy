@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import { createHmac, randomBytes } from 'node:crypto';
+import { createHmac, randomBytes, randomInt } from 'node:crypto';
 
 // ============================================================================
 // Email — transporter nodemailer + templates
@@ -51,7 +51,7 @@ export function hashToken(token: string): string {
 
 // --- Génération de code à 6 chiffres ---
 export function generateVerificationCode(): string {
-  return String(Math.floor(100000 + Math.random() * 900000));
+  return String(randomInt(100000, 1000000));
 }
 
 export function hashCode(code: string): string {

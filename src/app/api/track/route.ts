@@ -67,8 +67,11 @@ export async function POST(request: NextRequest) {
     let city: string | null = null;
     try {
       // Skip geolocation for localhost / private IPs
-      if (rawIp && rawIp !== '0.0.0.0' && !rawIp.startsWith('127.') && !rawIp.startsWith('10.') && !rawIp.startsWith('192.168.')) {
-        const geoUrl = `http://ip-api.com/json/${rawIp}?fields=status,country,countryCode,city&lang=fr`;
+      // Validate IP format to prevent SSRF — only allow valid IP addresses
+      const isIp = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(rawIp);
+      const isPrivate = !rawIp || rawIp === '0.0.0.0' || rawIp.startsWith('127.') || rawIp.startsWith('10.') || rawIp.startsWith('192.168.') || rawIp.startsWith('172.16.') || rawIp.startsWith('169.254.');
+      if (isIp && !isPrivate) {
+        const geoUrl = `https://ip-api.com/json/${rawIp}?fields=status,country,countryCode,city&lang=fr`;
         const geoRes = await fetch(geoUrl, { signal: AbortSignal.timeout(3000) });
         if (geoRes.ok) {
           const geo = await geoRes.json();

@@ -116,7 +116,15 @@ export async function POST(req: NextRequest) {
       if (!ALLOWED_MIME_TYPES.includes(proofFile.type)) {
         return NextResponse.json({ error: 'Type de fichier non autorisé' }, { status: 400 });
       }
-      const ext = path.extname(proofFile.name) || (proofFile.type === 'application/pdf' ? '.pdf' : '.jpg');
+      // Extension déduite du MIME type validé (JAMAIS du nom de fichier original)
+      const extMap: Record<string, string> = {
+        'image/jpeg': '.jpg',
+        'image/png': '.png',
+        'image/gif': '.gif',
+        'image/webp': '.webp',
+        'application/pdf': '.pdf',
+      };
+      const ext = extMap[proofFile.type] || '.jpg';
       const safeName = `${randomBytes(16).toString('hex')}${ext}`;
       proofPath = `${PROOF_UPLOAD_DIR}/${safeName}`;
       proofOriginalName = proofFile.name;
@@ -248,7 +256,15 @@ export async function PATCH(req: NextRequest) {
       if (!ALLOWED_MIME_TYPES.includes(proofFile.type)) {
         return NextResponse.json({ error: 'Type de fichier non autorisé' }, { status: 400 });
       }
-      const ext = path.extname(proofFile.name) || (proofFile.type === 'application/pdf' ? '.pdf' : '.jpg');
+      // Extension déduite du MIME type validé (JAMAIS du nom de fichier original)
+      const extMap: Record<string, string> = {
+        'image/jpeg': '.jpg',
+        'image/png': '.png',
+        'image/gif': '.gif',
+        'image/webp': '.webp',
+        'application/pdf': '.pdf',
+      };
+      const ext = extMap[proofFile.type] || '.jpg';
       const safeName = `${randomBytes(16).toString('hex')}${ext}`;
       proofPath = `${PROOF_UPLOAD_DIR}/${safeName}`;
       proofOriginalName = proofFile.name;

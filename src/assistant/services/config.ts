@@ -110,7 +110,8 @@ export async function getStatus(): Promise<AssistantStatus> {
       admin: config.adminEnabled,
     },
     aiProviderConfigured: checkAiProviderConfigured() || hasDbProvider,
-    version: SYSTEM_SAFETY_VERSION,
+    // version retirée de la réponse publique pour éviter l'information disclosure
+    // (était: version: SYSTEM_SAFETY_VERSION)
   };
 }
 

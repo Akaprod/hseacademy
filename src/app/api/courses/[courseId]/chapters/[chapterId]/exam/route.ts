@@ -59,7 +59,11 @@ export async function POST(
       if (passed && !completedChapters.includes(chapterId)) {
         completedChapters.push(chapterId);
       }
-      chapterScores[chapterId] = { score, total: totalQuestions, passed };
+      // Garder le MEILLEUR score (pas écraser avec un score inférieur)
+      const existing = chapterScores[chapterId];
+      if (!existing || score > existing.score) {
+        chapterScores[chapterId] = { score, total: totalQuestions, passed };
+      }
 
       // Calculate new overall score
       const allScores = Object.values(chapterScores);

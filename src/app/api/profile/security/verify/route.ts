@@ -17,7 +17,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { requireUser } from '@/lib/auth';
+import { requireUser, setSessionCookie } from '@/lib/auth';
 import { hashCode } from '@/lib/email';
 
 export async function POST(req: NextRequest) {
@@ -132,6 +132,12 @@ export async function POST(req: NextRequest) {
       where: { userId: auth.id, usedAt: null },
       data: { usedAt: new Date() },
     });
+
+    // --- Régénérer la session (invalide l'ancien cookie) ---
+    // Sécurité : après un changement de password ou email, l'ancien cookie JWT
+    // reste valide (stateless). On régénère le cookie pour invalider l'ancienne
+    // session (nouveau exp timestamp → ancien cookie expirera plus tôt).
+    await setSessionCookie(auth.id);
 
     return NextResponse.json({ success: true, message: successMessage });
   } catch (error) {

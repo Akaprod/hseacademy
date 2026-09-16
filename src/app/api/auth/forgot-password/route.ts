@@ -13,11 +13,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { generateVerificationToken, hashToken, sendPasswordResetEmail, sendSecurityAlertEmail, isEmailConfigured } from '@/lib/email';
+import { checkIpRateLimit, getClientIP } from '@/lib/rate-limit';
 
 const MAX_RESET_REQUESTS_24H = 3;
 const RESET_BLOCK_HOURS = 24;
+// Rate limit IP: 10 demandes / heure (en plus du rate limit par user déjà en place)
+const RATE_LIMIT_MAX = 10;
+const RATE_LIMIT_WINDOW = 60 * 60 * 1000;
 
 export async function POST(request: NextRequest) {
+  // Rate limit par IP
+  const clientIP = getClientIP(request);
+  const rl = checkIpRateLimit(clientIP, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW);
+  if (!rl.allowed) {
+    return NextResponse.json({
+      message: 'Si cet email existe, un lien de réinitialisation a été envoyé.'
+    });
+  }
   try {
     const body = await request.json();
     const { email } = body;

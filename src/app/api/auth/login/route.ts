@@ -13,11 +13,24 @@ import { db } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { setSessionCookie } from '@/lib/auth';
 import { sendSecurityAlertEmail, isEmailConfigured } from '@/lib/email';
+import { checkIpRateLimit, getClientIP } from '@/lib/rate-limit';
 
 const MAX_FAILED_ATTEMPTS = 3;
 const LOCK_HOURS = 4;
+// Rate limit IP: 10 tentatives de login / 15 minutes
+const RATE_LIMIT_MAX = 10;
+const RATE_LIMIT_WINDOW = 15 * 60 * 1000;
 
 export async function POST(request: NextRequest) {
+  // Rate limit par IP
+  const clientIP = getClientIP(request);
+  const rl = checkIpRateLimit(clientIP, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Trop de tentatives de connexion. Réessayez dans quelques minutes.' },
+      { status: 429 }
+    );
+  }
   try {
     const body = await request.json();
     const { email, password } = body;
